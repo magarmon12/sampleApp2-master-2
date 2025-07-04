@@ -2,7 +2,7 @@ import { Client, Databases, Account } from "react-native-appwrite";
 import { 
     EXPO_PUBLIC_APPWRITE_ENDPOINT, 
     EXPO_PUBLIC_APPWRITE_PROJECT_ID 
-} from "@/config/Config";
+} from "@/config/config";
 
 const client = new Client();
 client
