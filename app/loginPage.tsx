@@ -7,8 +7,7 @@ import { ValidIndicator } from '@/components/ui/ValidIndicator'
 import { router } from 'expo-router'
 import { AuthContext } from '@/contexts/AuthContext'
 import { ID } from 'react-native-appwrite'
-
-export default function SignUp(props: any) {
+export default function loginPage(props: any) {
     const [email, setEmail] = useState<string>('')
     const [password, setPassword] = useState<string>('')
     // email and password validity
@@ -28,7 +27,7 @@ export default function SignUp(props: any) {
 
     useEffect(() => {
         if( auth ) {
-            router.navigate("/loginPage")
+            router.navigate("/(tabs)")
         }
     }, [auth])
 
@@ -60,10 +59,10 @@ export default function SignUp(props: any) {
         console.log(user)
     },[user])
 
-    return (
-        <ThemedView style={styles.container}>
+  return (
+    <ThemedView style={styles.container}>
             <View style={styles.form}>
-                <Text style={styles.title}>Sign up</Text>
+                <Text style={styles.title}>Sign In</Text>
                 <View style={ styles.label }>
                     <ThemedText>Email</ThemedText>
                     <ValidIndicator valid={validEmail} />
@@ -98,12 +97,12 @@ export default function SignUp(props: any) {
                     <ThemedText
                         style={(validEmail && validPassword) ? styles.buttonText : styles.buttonTextDisabled}
                     >
-                        Sign up
+                        Sign In
                     </ThemedText>
                 </Pressable>
             </View>
         </ThemedView>
-    )
+  )
 }
 
 const styles = StyleSheet.create({
@@ -152,3 +151,4 @@ const styles = StyleSheet.create({
         justifyContent: "space-between"
     },
 })
+
