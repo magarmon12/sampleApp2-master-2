@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TextInput, Pressable } from 'react-native'
+/*import { View, Text, StyleSheet, TextInput, Pressable } from 'react-native'
 import { ThemedView } from '@/components/ThemedView'
 import { ThemedText } from '@/components/ThemedText'
 import { useState, useEffect, useContext } from 'react'
@@ -43,7 +43,7 @@ export default function SignUp(props: any) {
     return (
         <ThemedView style={styles.container}>
             <View style={styles.form}>
-                <Text style={styles.title}>Sign Up</Text> {/* ✅ Corrected here */}
+                <Text style={styles.title}>Sign Up</Text> {// ✅ Corrected here }
                 
                 <View style={styles.label}>
                     <ThemedText>Email</ThemedText>
@@ -134,3 +134,38 @@ const styles = StyleSheet.create({
         color: "#666"
     },
 })
+*/
+
+
+// app/index.tsx
+
+// app/index.tsx
+
+import { useEffect } from 'react';
+import { useRouter } from 'expo-router';
+import { Platform, View, ActivityIndicator } from 'react-native';
+
+export default function Index() {
+  const router = useRouter();
+
+  useEffect(() => {
+    // For web, wait for a frame before redirecting
+    if (Platform.OS === 'web') {
+      window.requestAnimationFrame(() => {
+        router.replace('/loginPage');
+      });
+    } else {
+      // Mobile can redirect after short timeout
+      const timeout = setTimeout(() => {
+        router.replace('/loginPage');
+      }, 100);
+      return () => clearTimeout(timeout);
+    }
+  }, []);
+
+  return (
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <ActivityIndicator size="large" />
+    </View>
+  );
+}
