@@ -5,8 +5,9 @@ import { useState, useEffect, useContext } from 'react';
 import { ValidIndicator } from '@/components/ui/ValidIndicator';
 import { router } from 'expo-router';
 import { AuthContext } from '@/contexts/AuthContext';
+import { ID } from 'react-native-appwrite';
 
-export default function LoginPage() {
+export default function SignUpPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [validEmail, setValidEmail] = useState(false);
@@ -15,13 +16,14 @@ export default function LoginPage() {
 
   const user = useContext(AuthContext);
 
-  const login = async () => {
+  const register = async () => {
     try {
+      await user.create(ID.unique(), email, password);
       const session = await user.createEmailPasswordSession(email, password);
       setAuth(session);
     } catch (error) {
       if (error instanceof Error) {
-        alert('Sign in failed: ' + error.message);
+        alert('Sign up failed: ' + error.message);
       }
     }
   };
@@ -43,7 +45,7 @@ export default function LoginPage() {
   return (
     <ThemedView style={styles.container}>
       <View style={styles.form}>
-        <Text style={styles.title}>Sign In</Text>
+        <Text style={styles.title}>Sign Up</Text>
 
         <View style={styles.label}>
           <ThemedText>Email</ThemedText>
@@ -71,13 +73,13 @@ export default function LoginPage() {
         <Pressable
           style={(validEmail && validPassword) ? styles.button : styles.buttonDisabled}
           disabled={!(validEmail && validPassword)}
-          onPress={login}
+          onPress={register}
         >
-          <ThemedText style={styles.buttonText}>Sign In</ThemedText>
+          <ThemedText style={styles.buttonText}>Sign Up</ThemedText>
         </Pressable>
 
-        <Pressable onPress={() => router.push('/signup')}>
-          <Text style={styles.linkText}>Don’t have an account? Sign Up</Text>
+        <Pressable onPress={() => router.push('/loginPage')}>
+          <Text style={styles.linkText}>Already have an account? Sign In</Text>
         </Pressable>
       </View>
     </ThemedView>
@@ -107,7 +109,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   button: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#007AFF',
     padding: 10,
     borderRadius: 5,
     marginTop: 10,
@@ -126,6 +128,6 @@ const styles = StyleSheet.create({
   linkText: {
     textAlign: 'center',
     marginTop: 20,
-    color: '#007AFF',
+    color: '#4CAF50',
   },
 });
