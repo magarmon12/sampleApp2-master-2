@@ -141,9 +141,9 @@ const styles = StyleSheet.create({
 
 // app/index.tsx
 
-import { useEffect } from 'react';
 import { useRouter } from 'expo-router';
-import { Platform, View, ActivityIndicator } from 'react-native';
+import { useEffect } from 'react';
+import { ActivityIndicator, Platform, View } from 'react-native';
 
 export default function Index() {
   const router = useRouter();

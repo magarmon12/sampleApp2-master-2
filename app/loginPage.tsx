@@ -28,7 +28,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (auth) {
-      router.replace('/(tabs)');
+      router.replace('/homeScreen');
     }
   }, [auth]);
 
