@@ -1,38 +1,35 @@
-// app/home.tsx
-import React from 'react';
-import { View, Text, StyleSheet, FlatList, Pressable, Dimensions } from 'react-native';
+// app/homeScreen.tsx
 import { Image } from 'expo-image';
-import Carousel from 'react-native-reanimated-carousel';
 import { router } from 'expo-router';
-
-const screenWidth = Dimensions.get('window').width;
-
-const carouselImages = [
-  require('@/assets/images/carousel1.jpg'),
-  require('@/assets/images/carousel2.jpg'),
-  require('@/assets/images/carousel3.jpg'),
-];
+import React from 'react';
+import {
+  FlatList,
+  Pressable,
+  StyleSheet,
+  Text,
+  View
+} from 'react-native';
 
 const destinations = [
   {
     id: '1',
     title: 'Rara Lake',
     description: 'Remote, serene, and untouched beauty of Nepal.',
-    image: require('@/assets/images/rara.jpg'),
+    image: require('../assets/images/rara.jpg'),
     rating: 4.8,
   },
   {
     id: '2',
     title: 'Tansen Palpa',
     description: 'A hidden cultural gem with stunning views.',
-    image: require('@/assets/images/palpa.jpg'),
+    image: require('../assets/images/palpa.jpg'),
     rating: 4.6,
   },
   {
     id: '3',
     title: 'Kalinchowk',
     description: 'Snow-capped hills and panoramic Himalayan views.',
-    image: require('@/assets/images/kalinchowk.jpg'),
+    image: require('../assets/images/kalinchowk.jpg'),
     rating: 4.7,
   },
 ];
@@ -41,19 +38,6 @@ export default function HomeScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.heading}>Explore Nepal</Text>
-
-      {/* Carousel Section */}
-      <Carousel
-        loop
-        width={screenWidth}
-        height={200}
-        autoPlay
-        data={carouselImages}
-        scrollAnimationDuration={1500}
-        renderItem={({ item }) => (
-          <Image source={item} style={styles.carouselImage} contentFit="cover" />
-        )}
-      />
 
       {/* Underrated Destinations */}
       <Text style={styles.subHeading}>Underrated Destinations</Text>
@@ -103,12 +87,6 @@ const styles = StyleSheet.create({
     marginTop: 20,
     marginBottom: 10,
     color: '#333',
-  },
-  carouselImage: {
-    width: screenWidth - 20,
-    height: 200,
-    marginHorizontal: 10,
-    borderRadius: 10,
   },
   cardList: {
     paddingHorizontal: 10,
