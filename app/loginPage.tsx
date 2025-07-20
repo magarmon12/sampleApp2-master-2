@@ -1,19 +1,21 @@
-import { View, Text, StyleSheet, TextInput, Pressable } from 'react-native';
-import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
-import { useState, useEffect, useContext } from 'react';
+import { ThemedView } from '@/components/ThemedView';
 import { ValidIndicator } from '@/components/ui/ValidIndicator';
-import { router } from 'expo-router';
 import { AuthContext } from '@/contexts/AuthContext';
+import type { Models } from 'appwrite';
+import { Account } from 'appwrite';
+import { router } from 'expo-router';
+import { useContext, useEffect, useState } from 'react';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [validEmail, setValidEmail] = useState(false);
   const [validPassword, setValidPassword] = useState(false);
-  const [auth, setAuth] = useState(null);
+  const [auth, setAuth] = useState<Models.Session | null>(null);
 
-  const user = useContext(AuthContext);
+  const user = useContext(AuthContext) as Account;
 
   const login = async () => {
     try {
