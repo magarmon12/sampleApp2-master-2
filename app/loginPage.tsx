@@ -1,12 +1,21 @@
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+// app/loginPage.tsx
 import { ValidIndicator } from '@/components/ui/ValidIndicator';
 import { AuthContext } from '@/contexts/AuthContext';
 import type { Models } from 'appwrite';
 import { Account } from 'appwrite';
 import { router } from 'expo-router';
-import { useContext, useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useContext, useEffect, useState } from 'react';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -43,91 +52,136 @@ export default function LoginPage() {
   }, [password]);
 
   return (
-    <ThemedView style={styles.container}>
-      <View style={styles.form}>
-        <Text style={styles.title}>Sign In</Text>
+    <SafeAreaView style={styles.safeArea}>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+          <View style={styles.card}>
+            <Text style={styles.title}>Sign In</Text>
 
-        <View style={styles.label}>
-          <ThemedText>Email</ThemedText>
-          <ValidIndicator valid={validEmail} />
-        </View>
-        <TextInput
-          style={styles.input}
-          placeholder="you@example.com"
-          onChangeText={setEmail}
-          value={email}
-        />
+            <View style={styles.labelRow}>
+              <Text style={styles.label}>Email</Text>
+              <ValidIndicator valid={validEmail} />
+            </View>
+            <TextInput
+              style={styles.input}
+              placeholder="you@example.com"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              onChangeText={setEmail}
+              value={email}
+            />
 
-        <View style={styles.label}>
-          <ThemedText>Password</ThemedText>
-          <ValidIndicator valid={validPassword} />
-        </View>
-        <TextInput
-          style={styles.input}
-          placeholder="Minimum 8 characters"
-          secureTextEntry
-          onChangeText={setPassword}
-          value={password}
-        />
+            <View style={styles.labelRow}>
+              <Text style={styles.label}>Password</Text>
+              <ValidIndicator valid={validPassword} />
+            </View>
+            <TextInput
+              style={styles.input}
+              placeholder="Minimum 8 characters"
+              secureTextEntry
+              onChangeText={setPassword}
+              value={password}
+            />
 
-        <Pressable
-          style={(validEmail && validPassword) ? styles.button : styles.buttonDisabled}
-          disabled={!(validEmail && validPassword)}
-          onPress={login}
-        >
-          <ThemedText style={styles.buttonText}>Sign In</ThemedText>
-        </Pressable>
+            <Pressable
+              style={[
+                styles.button,
+                !(validEmail && validPassword) && styles.buttonDisabled,
+              ]}
+              disabled={!(validEmail && validPassword)}
+              onPress={login}
+            >
+              <Text style={styles.buttonText}>Sign In</Text>
+            </Pressable>
 
-        <Pressable onPress={() => router.push('/signup')}>
-          <Text style={styles.linkText}>Don’t have an account? Sign Up</Text>
-        </Pressable>
-      </View>
-    </ThemedView>
+            <Pressable onPress={() => router.push('/signup')}>  
+              <Text style={styles.link}>Don’t have an account? Sign Up</Text>
+            </Pressable>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  form: {
-    marginHorizontal: 50,
-    padding: 15,
-    marginTop: 100,
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#f2f2f7',
+  },
+  flex: { flex: 1 },
+  container: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  card: {
+    width: '100%',
+    maxWidth: 450,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 32,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
   title: {
     fontSize: 32,
+    fontWeight: '700',
+    color: '#333333',
+    marginBottom: 32,
     textAlign: 'center',
-    marginBottom: 20,
   },
-  input: {
-    backgroundColor: '#dfe7f5',
-    padding: 10,
-    fontSize: 16,
-    marginBottom: 15,
-  },
-  label: {
+  labelRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  label: {
+    fontSize: 18,
+    color: '#333333',
+  },
+  input: {
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    fontSize: 18,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#e5e5e5',
   },
   button: {
-    backgroundColor: '#4CAF50',
-    padding: 10,
-    borderRadius: 5,
-    marginTop: 10,
+    backgroundColor: '#0066FF',
+    borderRadius: 8,
+    paddingVertical: 18,
+    alignItems: 'center',
+    marginTop: 12,
+    shadowColor: '#0066FF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
   },
   buttonDisabled: {
-    backgroundColor: '#ccc',
-    padding: 10,
-    borderRadius: 5,
-    marginTop: 10,
+    opacity: 0.6,
   },
   buttonText: {
-    textAlign: 'center',
-    color: '#fff',
-    fontWeight: 'bold',
+    fontSize: 18,
+    color: '#ffffff',
+    fontWeight: '700',
   },
-  linkText: {
-    textAlign: 'center',
+  link: {
     marginTop: 20,
-    color: '#007AFF',
+    textAlign: 'center',
+    color: '#0066FF',
+    fontSize: 16,
   },
 });

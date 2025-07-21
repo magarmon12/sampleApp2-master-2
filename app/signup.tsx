@@ -1,8 +1,9 @@
 // app/signup.tsx
+import { ValidIndicator } from '@/components/ui/ValidIndicator';
 import { account } from '@/lib/appwrite';
 import { ID } from 'appwrite';
 import { router } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -18,12 +19,24 @@ import {
 export default function SignUpPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [validEmail, setValidEmail] = useState(false);
+  const [validPassword, setValidPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Validate email and password
+  useEffect(() => {
+    setValidEmail(email.includes('@'));
+  }, [email]);
+
+  useEffect(() => {
+    setValidPassword(password.length >= 8);
+  }, [password]);
 
   const handleSignUp = async () => {
     try {
       setIsLoading(true);
       await account.create(ID.unique(), email, password);
+      // Ensure no existing session
       await account.deleteSession('current');
       alert('Account created! Please log in.');
       router.replace('/loginPage');
@@ -46,30 +59,45 @@ export default function SignUpPage() {
         >
           <View style={styles.card}>
             <Text style={styles.title}>Create Account</Text>
+
+            <View style={styles.labelRow}>
+              <Text style={styles.label}>Email</Text>
+              <ValidIndicator valid={validEmail} />
+            </View>
             <TextInput
               style={styles.input}
-              placeholder="Email"
+              placeholder="you@example.com"
               keyboardType="email-address"
               autoCapitalize="none"
               onChangeText={setEmail}
               value={email}
             />
+
+            <View style={styles.labelRow}>
+              <Text style={styles.label}>Password</Text>
+              <ValidIndicator valid={validPassword} />
+            </View>
             <TextInput
               style={styles.input}
-              placeholder="Password (min 8 characters)"
+              placeholder="Minimum 8 characters"
               secureTextEntry
               onChangeText={setPassword}
               value={password}
             />
+
             <Pressable
-              style={[styles.button, isLoading && styles.buttonDisabled]}
+              style={[
+                styles.button,
+                !(validEmail && validPassword) && styles.buttonDisabled,
+              ]}
+              disabled={!(validEmail && validPassword) || isLoading}
               onPress={handleSignUp}
-              disabled={isLoading}
             >
               <Text style={styles.buttonText}>
-                {isLoading ? 'Signing up...' : 'Sign Up'}
+                {isLoading ? 'Signing Up...' : 'Sign Up'}
               </Text>
             </Pressable>
+
             <Pressable onPress={() => router.push('/loginPage')}>
               <Text style={styles.link}>Already have an account? Sign In</Text>
             </Pressable>
@@ -90,14 +118,14 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
+    padding: 24,
   },
   card: {
     width: '100%',
-    maxWidth: 400,
+    maxWidth: 450,
     backgroundColor: '#ffffff',
     borderRadius: 12,
-    padding: 24,
+    padding: 32,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -105,28 +133,39 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '600',
+    fontSize: 32,
+    fontWeight: '700',
     color: '#333333',
-    marginBottom: 24,
+    marginBottom: 32,
     textAlign: 'center',
   },
+  labelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  label: {
+    fontSize: 18,
+    color: '#333333',
+  },
   input: {
+    width: '100%',
     backgroundColor: '#f9f9f9',
     borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    fontSize: 16,
-    marginBottom: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    fontSize: 18,
+    marginBottom: 20,
     borderWidth: 1,
     borderColor: '#e5e5e5',
   },
   button: {
     backgroundColor: '#0066FF',
     borderRadius: 8,
-    paddingVertical: 14,
+    paddingVertical: 18,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 12,
     shadowColor: '#0066FF',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
@@ -137,14 +176,14 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   buttonText: {
-    fontSize: 16,
+    fontSize: 18,
     color: '#ffffff',
-    fontWeight: '600',
+    fontWeight: '700',
   },
   link: {
-    marginTop: 16,
+    marginTop: 20,
     textAlign: 'center',
     color: '#0066FF',
-    fontSize: 14,
+    fontSize: 16,
   },
 });

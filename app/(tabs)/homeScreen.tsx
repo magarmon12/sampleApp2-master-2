@@ -1,48 +1,172 @@
-// app/tabs/homeScreen.tsx
+// app/(tabs)/homeScreen.tsx
+import { IconSymbol } from '@/components/ui/IconSymbol';
+import { Colors } from '@/constants/Colors';
+import { useColorScheme } from '@/hooks/useColorScheme';
 import { useRouter } from 'expo-router';
-import React from 'react';
+import React, { useState } from 'react';
 import {
-  Dimensions,
-  ImageBackground,
-  Linking,
+  FlatList,
+  Image,
   Pressable,
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
+  useWindowDimensions,
 } from 'react-native';
 
-const { height: screenHeight } = Dimensions.get('window');
+// Section data
+const topPlaces = [
+  { id: 'kalinchowk', title: 'Kalinchowk', image: require('../../assets/images/kalinchowk.jpg') },
+  { id: 'pokhara',    title: 'Pokhara Lakeside', image: require('../../assets/images/palpa.jpg') },
+  { id: 'nagarkot',   title: 'Nagarkot Sunrise', image: require('../../assets/images/palpa.jpg') },
+];
+const adventureDestinations = [
+  { id: 'bungee',    title: 'Bungee Jumping',      image: require('../../assets/images/palpa.jpg') },
+  { id: 'zipline',   title: 'Zip Lining',          image: require('../../assets/images/palpa.jpg') },
+  { id: 'skydiving', title: 'Skydiving',          image: require('../../assets/images/palpa.jpg') },
+  { id: 'rafting',   title: 'White Water Rafting', image: require('../../assets/images/palpa.jpg') },
+];
+const cultureDestinations = [
+  { id: 'museum',    title: 'Museum Tour',         image: require('../../assets/images/palpa.jpg') },
+  { id: 'temple',    title: 'Temple Visit',        image: require('../../assets/images/palpa.jpg') },
+  { id: 'gallery',   title: 'Art Gallery',         image: require('../../assets/images/palpa.jpg') },
+  { id: 'heritage',  title: 'Heritage Walk',       image: require('../../assets/images/palpa.jpg') },
+];
+
+type Destination = {
+  id: string;
+  title: string;
+  image: any;
+};
 
 export default function HomeScreen() {
   const router = useRouter();
-  const handleVisit = () => {
-    const url = 'https://example.com';
-    Linking.openURL(url);
+  const colorScheme = useColorScheme();
+  const { width } = useWindowDimensions();
+
+  // Local state
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Responsive card dimensions
+  const MAX_CARD_WIDTH = 280;
+  const baseCardWidth = width * 0.7;
+  const cardWidth = Math.min(MAX_CARD_WIDTH, baseCardWidth);
+  const cardHeight = cardWidth * 0.75;
+  const cardMargin = 16;
+
+  // Navigate
+  const goToDestination = (id: string) => {
+    router.push(`destination/${id}` as any);
   };
+
+  // Toggle favorites
+  const toggleFavorite = (id: string) => {
+    setFavorites(prev =>
+      prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id]
+    );
+  };
+
+  // Render single card
+  const renderCard = ({ item }: { item: Destination }) => (
+    <View style={[styles.card, { width: cardWidth, marginRight: cardMargin }]}>  
+      <View style={styles.imageWrapper}>
+        <Pressable onPress={() => goToDestination(item.id)}>
+          <Image
+            source={item.image}
+            style={{ width: cardWidth, height: cardHeight }}
+            resizeMode="cover"
+          />
+        </Pressable>
+        <Pressable
+          style={styles.favoriteButton}
+          onPress={() => toggleFavorite(item.id)}
+        >
+          <IconSymbol
+            name={favorites.includes(item.id) ? 'heart.fill' : 'heart'}
+            size={24}
+            color={Colors[colorScheme ?? 'light'].tint}
+          />
+        </Pressable>
+      </View>
+      <Pressable onPress={() => goToDestination(item.id)} style={styles.titleButton}>
+        <Text style={styles.cardTitle}>{item.title}</Text>
+      </Pressable>
+    </View>
+  );
+
+  // Generic filter function for destinations
+  const filterData = (data: Destination[]): Destination[] =>
+    data.filter(d => d.title.toLowerCase().includes(searchQuery.toLowerCase()));
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <ImageBackground
-          source={require('../../assets/images/kalinchowk.jpg')} // correct relative path from app/tabs
-          style={[styles.cover, { height: screenHeight * 0.4 }]
-          }
-          resizeMode="cover"
-        >
-          <View style={styles.overlay}>
-            <Text style={styles.headline}>Welcome to Our App!</Text>
-            <Text style={styles.subheading}>Discover amazing features</Text>
-            <Pressable style={styles.button} onPress={handleVisit}>
-              <Text style={styles.buttonText}>Visit Our Site</Text>
-            </Pressable>
+      <ScrollView>
+        {/* Cover with search & text */}
+        <View style={styles.coverContainer}>
+          <Image
+            source={require('../../assets/images/kalinchowk.jpg')}
+            style={styles.coverImage}
+            resizeMode="cover"
+          />
+          <View style={styles.coverOverlay}>
+            <View style={styles.searchBox}>
+              <IconSymbol name="magnifyingglass" size={20} color="#666" />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search destinations"
+                placeholderTextColor="#888"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+            </View>
+            <View style={styles.overlayTextContainer}>
+              <Text style={styles.headline}>Welcome to Our App!</Text>
+              <Text style={styles.subheading}>Discover amazing features</Text>
+            </View>
           </View>
-        </ImageBackground>
+        </View>
 
-        <View style={styles.content}>
-          {/* Additional content goes here */}
-          <Text style={styles.contentText}>Here is some more content below the cover image.</Text>
+        {/* Top Places */}
+        <View style={styles.sectionContainer}>
+          <Text style={styles.sectionHeader}>Top Places</Text>
+          <FlatList
+            data={filterData(topPlaces)}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 16 }}
+            renderItem={renderCard}
+            keyExtractor={item => item.id}
+          />
+        </View>
+
+        {/* Adventure */}
+        <View style={styles.sectionContainer}>
+          <Text style={styles.sectionHeader}>Adventure</Text>
+          <FlatList
+            data={filterData(adventureDestinations)}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 16 }}
+            renderItem={renderCard}
+            keyExtractor={item => item.id}
+          />
+        </View>
+
+        {/* Culture */}
+        <View style={styles.sectionContainer}>
+          <Text style={styles.sectionHeader}>Culture</Text>
+          <FlatList
+            data={filterData(cultureDestinations)}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 16 }}
+            renderItem={renderCard}
+            keyExtractor={item => item.id}
+          />
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -50,60 +174,36 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#f2f2f7',
+  safeArea: { flex: 1, backgroundColor: '#f2f2f7' },
+
+  // Cover
+  coverContainer: { position: 'relative', width: '100%', aspectRatio: 2.5 },
+  coverImage: { width: '100%', height: '100%' },
+  coverOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.3)', padding: 16, justifyContent: 'space-between'
   },
-  scrollContainer: {
-    flexGrow: 1,
+  searchBox: {
+    flexDirection: 'row', alignSelf: 'flex-end', alignItems: 'center',
+    backgroundColor: '#fff', borderRadius: 24, paddingHorizontal: 12, paddingVertical: 8,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3
   },
-  cover: {
-    width: '100%',
-    justifyContent: 'center',
+  searchInput: { flex: 1, marginLeft: 8, fontSize: 14, color: '#333' },
+  overlayTextContainer: { alignItems: 'center', marginBottom: 16 },
+  headline: { fontSize: 28, fontWeight: '700', color: '#fff' },
+  subheading: { fontSize: 16, color: '#fff', marginTop: 4 },
+
+  // Sections
+  sectionContainer: { marginTop: 24 },
+  sectionHeader: { fontSize: 24, fontWeight: '700', color: '#333', paddingHorizontal: 16, marginBottom: 12 },
+
+  // Card
+  card: { backgroundColor: '#fff', borderRadius: 8, overflow: 'hidden' },
+  imageWrapper: { position: 'relative' },
+  favoriteButton: {
+    position: 'absolute', top: 8, right: 8,
+    backgroundColor: 'rgba(255,255,255,0.8)', borderRadius: 16, padding: 4, zIndex: 10
   },
-  overlay: {
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    marginHorizontal: 24,
-    borderRadius: 12,
-    padding: 24,
-    alignItems: 'center',
-  },
-  headline: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#ffffff',
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-  subheading: {
-    fontSize: 18,
-    fontWeight: '500',
-    color: '#ffffff',
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  button: {
-    backgroundColor: '#0066FF',
-    borderRadius: 8,
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    shadowColor: '#0066FF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  buttonText: {
-    fontSize: 18,
-    color: '#ffffff',
-    fontWeight: '700',
-  },
-  content: {
-    padding: 24,
-  },
-  contentText: {
-    fontSize: 16,
-    color: '#333333',
-    marginBottom: 16,
-  },
+  titleButton: { padding: 12 },
+  cardTitle: { fontSize: 16, fontWeight: '600', color: '#333' },
 });
