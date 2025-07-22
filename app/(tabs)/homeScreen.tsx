@@ -19,21 +19,21 @@ import {
 
 // Section data
 const topPlaces = [
-  { id: 'kalinchowk', title: 'Kalinchowk', image: require('../../assets/images/kalinchowk.jpg') },
-  { id: 'pokhara',    title: 'Pokhara Lakeside', image: require('../../assets/images/palpa.jpg') },
-  { id: 'nagarkot',   title: 'Nagarkot Sunrise', image: require('../../assets/images/palpa.jpg') },
+  { id: 'kalinchowk', title: 'Kalinchowk', image: require('../../assets/images/HomeKalinchowk.jpg') },
+  { id: 'pokhara',    title: 'Pokhara Lakeside', image: require('../../assets/images/HomePokhara.jpg') },
+  { id: 'nagarkot',   title: 'Nagarkot Sunrise', image: require('../../assets/images/HomeNagarkot.jpg') },
 ];
 const adventureDestinations = [
-  { id: 'bungee',    title: 'Bungee Jumping',      image: require('../../assets/images/palpa.jpg') },
-  { id: 'zipline',   title: 'Zip Lining',          image: require('../../assets/images/palpa.jpg') },
-  { id: 'skydiving', title: 'Skydiving',          image: require('../../assets/images/palpa.jpg') },
-  { id: 'rafting',   title: 'White Water Rafting', image: require('../../assets/images/palpa.jpg') },
+  { id: 'bungee',    title: 'Bungee Jumping',      image: require('../../assets/images/HomeBungee.jpg') },
+  { id: 'zipline',   title: 'Zip Lining',          image: require('../../assets/images/HomeZipline.jpg') },
+  { id: 'skydiving', title: 'Skydiving',          image: require('../../assets/images/HomeSkydiving.jpg') },
+  { id: 'rafting',   title: 'White Water Rafting', image: require('../../assets/images/Homerafting.jpg') },
 ];
 const cultureDestinations = [
-  { id: 'museum',    title: 'Museum Tour',         image: require('../../assets/images/palpa.jpg') },
-  { id: 'temple',    title: 'Temple Visit',        image: require('../../assets/images/palpa.jpg') },
-  { id: 'gallery',   title: 'Art Gallery',         image: require('../../assets/images/palpa.jpg') },
-  { id: 'heritage',  title: 'Heritage Walk',       image: require('../../assets/images/palpa.jpg') },
+  { id: 'Pashupatinath',    title: 'Pashupatinath temple',         image: require('../../assets/images/HomePashupatinath.jpg') },
+  { id: 'Bouddha',    title: 'Bouddhanath Stupa',        image: require('../../assets/images/HomeBouddha.jpg') },
+  { id: 'Bhaktapur',   title: 'Art Bhaktapur',         image: require('../../assets/images/HomeBhaktapur.jpg') },
+  { id: 'Lumbini',  title: 'Lumbini ',       image: require('../../assets/images/HomeLumbini.jpg') },
 ];
 
 type Destination = {

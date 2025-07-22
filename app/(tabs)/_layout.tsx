@@ -40,12 +40,12 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="Discover"
+        name="Underrated"
         options={{
-          title: 'Discover',
+          title: 'Gems',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="location.north.fill" color={color} />,
         }}
-      />
+      />                 
       <Tabs.Screen
         name="Profile"
         options={{
