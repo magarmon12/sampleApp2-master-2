@@ -8,7 +8,6 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 // authentication context
 import { AuthContext } from '@/contexts/AuthContext';
 import { account } from '@/lib/appwrite';
-import { useState } from 'react'
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
