@@ -225,33 +225,36 @@ export default function HomeScreen() {
           contentContainerStyle={{ paddingHorizontal: 16 }}
           renderItem={({ item }) => <FestivalPill festival={item} />}
         />
+{/* ========================= MINI ITINERARIES ======================== */}
+<SectionHeader
+  title="Mini Itineraries"
+  actionLabel="Browse itineraries"
+  onAction={() => router.push('/itineraries')}
+/>
 
-        {/* ========================= MINI ITINERARIES ======================== */}
-        <SectionHeader title="Mini Itineraries" actionLabel="Browse itineraries" onAction={() => router.push('/itineraries' as any)} />
-        <View style={styles.itineraryList}>
-          {ITINERARIES.map((it) => (
-            <Pressable
-              key={it.id}
-              onPress={() => router.push({ pathname: '/itineraries', params: { preset: it.id } } as any)}
-              style={styles.itineraryCard}
-            >
-              <Image source={it.cover} style={styles.itineraryCover} />
-              <View style={styles.itineraryInfo}>
-                <Text style={styles.itineraryTitle}>{it.title}</Text>
-                <Text style={styles.itineraryMeta}>{it.days} days • {it.highlights[0]}</Text>
-                <View style={styles.itineraryChips}>
-                  {it.highlights.slice(0, 3).map((h, i) => (
-                    <View key={i} style={styles.chip}>
-                      <Text style={styles.chipText}>{h}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-              <IconSymbol name="chevron.right" size={18} color="#9ca3af" />
-            </Pressable>
+<View style={styles.itineraryList}>
+  {ITINERARIES.map((it) => (
+    <Pressable
+      key={it.id}
+      onPress={() => router.push({ pathname: '/itineraries/[id]', params: { id: it.id } })}
+      style={styles.itineraryCard}
+    >
+      <Image source={it.cover} style={styles.itineraryCover} />
+      <View style={styles.itineraryInfo}>
+        <Text style={styles.itineraryTitle}>{it.title}</Text>
+        <Text style={styles.itineraryMeta}>{it.days} days • {it.highlights[0]}</Text>
+        <View style={styles.itineraryChips}>
+          {it.highlights.slice(0, 3).map((h, i) => (
+            <View key={i} style={styles.chip}>
+              <Text style={styles.chipText}>{h}</Text>
+            </View>
           ))}
         </View>
-
+      </View>
+      <IconSymbol name="chevron.right" size={18} color="#9ca3af" />
+    </Pressable>
+  ))}
+</View>
         {/* ============================== CTA =============================== */}
         <View style={styles.cta}>
           <Text style={styles.ctaText}>Ready to plan your trip?</Text>
