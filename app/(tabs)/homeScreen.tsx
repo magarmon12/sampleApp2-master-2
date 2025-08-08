@@ -3,6 +3,8 @@ import { IconSymbol } from '@/components/ui/IconSymbol';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useRouter } from 'expo-router';
+
+
 import React, { useCallback, useRef, useState } from 'react';
 import {
   FlatList,
@@ -216,15 +218,25 @@ export default function HomeScreen() {
         />
 
         {/* ========================= FESTIVAL CALENDAR ======================= */}
-        <SectionHeader title="Festival Calendar" actionLabel="See calendar" onAction={() => router.push('/festivals' as any)} />
-        <FlatList
-          data={FESTIVALS}
-          keyExtractor={(f) => f.id}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 16 }}
-          renderItem={({ item }) => <FestivalPill festival={item} />}
-        />
+        <SectionHeader
+  title="Festival Calendar"
+  actionLabel="See calendar"
+  onAction={() => router.push('/festivals' as any)}
+/>
+
+<FlatList
+  data={FESTIVALS}
+  keyExtractor={(f) => f.id}
+  horizontal
+  showsHorizontalScrollIndicator={false}
+  contentContainerStyle={{ paddingHorizontal: 16 }}
+  renderItem={({ item }) => (
+    <Pressable onPress={() => router.push(`/festivals/${item.id}` as any)}>
+      <FestivalPill festival={item} />
+    </Pressable>
+  )}
+/>
+        
 {/* ========================= MINI ITINERARIES ======================== */}
 <SectionHeader
   title="Mini Itineraries"
