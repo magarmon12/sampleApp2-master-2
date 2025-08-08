@@ -3,7 +3,7 @@ import { IconSymbol } from '@/components/ui/IconSymbol';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   FlatList,
   Image,
@@ -16,26 +16,42 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
+import Animated, { Extrapolation, interpolate, useAnimatedStyle } from 'react-native-reanimated';
+import Carousel, { ICarouselInstance } from 'react-native-reanimated-carousel';
 
 /* ----------------------------- Mocked Content ----------------------------- */
+type Place = { id: string; title: string; image: any; location?: string };
+type Festival = { id: string; name: string; date: string; city: string };
+type Itinerary = { id: string; title: string; days: number; highlights: string[]; cover: any };
 
-// Top places (uses your existing images)
-const TOP_PLACES = [
-  { id: 'kalinchowk', title: 'Kalinchowk', image: require('../../assets/images/HomeKalinchowk.jpg') },
-  { id: 'pokhara',    title: 'Pokhara Lakeside', image: require('../../assets/images/HomePokhara.jpg') },
-  { id: 'nagarkot',   title: 'Nagarkot Sunrise', image: require('../../assets/images/HomeNagarkot.jpg') },
+const TOP_PLACES: Place[] = [
+  { id: 'kalinchowk', title: 'Kalinchowk', image: require('../../assets/images/HomeKalinchowk.jpg'), location: 'Dolakha' },
+  { id: 'pokhara', title: 'Pokhara Lakeside', image: require('../../assets/images/HomePokhara.jpg'), location: 'Pokhara' },
+  { id: 'nagarkot', title: 'Nagarkot Sunrise', image: require('../../assets/images/HomeNagarkot.jpg'), location: 'Nagarkot' },
 ];
 
-// Festival calendar (sample data)
-const FESTIVALS = [
+const ADVENTURE: Place[] = [
+  { id: 'bungee', title: 'Bungee Jumping', image: require('../../assets/images/HomeBungee.jpg'), location: 'Kushma' },
+  { id: 'zipline', title: 'Zip Lining', image: require('../../assets/images/HomeZipline.jpg'), location: 'Pokhara' },
+  { id: 'skydiving', title: 'Skydiving', image: require('../../assets/images/HomeSkydiving.jpg'), location: 'Pokhara' },
+  { id: 'rafting', title: 'White Water Rafting', image: require('../../assets/images/Homerafting.jpg'), location: 'Trishuli' },
+];
+
+const CULTURE: Place[] = [
+  { id: 'pashupatinath', title: 'Pashupatinath Temple', image: require('../../assets/images/HomePashupatinath.jpg'), location: 'Kathmandu' },
+  { id: 'bouddha', title: 'Bouddhanath Stupa', image: require('../../assets/images/HomeBouddha.jpg'), location: 'Kathmandu' },
+  { id: 'bhaktapur', title: 'Art Bhaktapur', image: require('../../assets/images/HomeBhaktapur.jpg'), location: 'Bhaktapur' },
+  { id: 'lumbini', title: 'Lumbini', image: require('../../assets/images/HomeLumbini.jpg'), location: 'Rupandehi' },
+];
+
+const FESTIVALS: Festival[] = [
   { id: 'dashain', name: 'Dashain', date: 'Oct 10', city: 'Kathmandu' },
-  { id: 'tihar',   name: 'Tihar',   date: 'Nov 3',  city: 'Bhaktapur' },
-  { id: 'holi',    name: 'Holi',    date: 'Mar 22', city: 'Pokhara' },
-  { id: 'losar',   name: 'Losar',   date: 'Feb 9',  city: 'Boudha' },
+  { id: 'tihar', name: 'Tihar', date: 'Nov 3', city: 'Bhaktapur' },
+  { id: 'holi', name: 'Holi', date: 'Mar 22', city: 'Pokhara' },
+  { id: 'losar', name: 'Losar', date: 'Feb 9', city: 'Boudha' },
 ];
 
-// Mini itineraries (sample data)
-const ITINERARIES = [
+const ITINERARIES: Itinerary[] = [
   {
     id: 'ktm3',
     title: '3-Day Kathmandu Heritage',
@@ -59,16 +75,12 @@ const ITINERARIES = [
   },
 ];
 
-/* --------------------------------- Types --------------------------------- */
-type Place = { id: string; title: string; image: any };
-type Itinerary = {
-  id: string;
-  title: string;
-  days: number;
-  highlights: string[];
-  cover: any;
-};
-type Festival = { id: string; name: string; date: string; city: string };
+// Slides for the top carousel (you can mix any highlights you want)
+const CAROUSEL_SLIDES: Place[] = [
+  { id: 'pokhara', title: 'Sunrise over Phewa', image: require('../../assets/images/HomePokhara.jpg'), location: 'Pokhara' },
+  { id: 'kalinchowk', title: 'Snowy Kalinchowk', image: require('../../assets/images/HomeKalinchowk.jpg'), location: 'Dolakha' },
+  { id: 'bhaktapur', title: 'Bhaktapur Heritage', image: require('../../assets/images/HomeBhaktapur.jpg'), location: 'Bhaktapur' },
+];
 
 /* --------------------------------- Screen -------------------------------- */
 export default function HomeScreen() {
@@ -76,90 +88,135 @@ export default function HomeScreen() {
   const colorScheme = useColorScheme();
   const { width } = useWindowDimensions();
 
+  // UI State
   const [search, setSearch] = useState('');
+  const [favs, setFavs] = useState<string[]>([]);
 
   // Card sizing (responsive)
-  const maxCardWidth = 280;
-  const cardWidth = Math.min(maxCardWidth, width * 0.7);
-  const cardHeight = cardWidth * 0.75;
+  const cardW = Math.min(280, width * 0.7);
+  const cardH = cardW * 0.72;
 
-  // Filter for search bar
-  const filteredPlaces = useMemo<Place[]>(
-    () => TOP_PLACES.filter(p => p.title.toLowerCase().includes(search.trim().toLowerCase())),
+  // Search filter
+  const filterPlaces = useCallback(
+    (list: Place[]) =>
+      list.filter((p) => p.title.toLowerCase().includes(search.trim().toLowerCase())),
     [search]
   );
 
-  // ✅ FIX: route names must match your files. We route to /location-details (you created it),
-  // and to tabs using /(tabs)/Discover, etc. Adjust if you add real pages.
-  const onPlacePress = (id: string, title: string) =>
-    router.push({ pathname: '/location-details', params: { id, title } });
+  // Favourite toggle
+  const toggleFav = (id: string) =>
+    setFavs((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
-  const go = (path: string) => router.push(path as any);
+  const tint = Colors[colorScheme ?? 'light'].tint;
+
+  // Navigation helpers — only to existing routes in your tree
+  const openDetails = (id: string) =>
+    router.push({ pathname: '/location-details', params: { id } });
+  const goDiscover = () => router.push('/(tabs)/Discover');
+  const goFavourites = () => router.push('/(tabs)/Favourites');
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.scrollBody} showsVerticalScrollIndicator={false}>
-        {/* ============================== HERO ============================== */}
-        <View style={styles.hero}>
-          <Image
-            source={require('../../assets/images/kalinchowk.jpg')}
-            style={styles.heroImage}
-            resizeMode="cover"
+      <ScrollView contentContainerStyle={styles.scrollBody}>
+        {/* ============================== TOP CAROUSEL ============================== */}
+        <View style={{ paddingTop: 8, marginBottom: 8 }}>
+          <TopCarousel
+            slides={CAROUSEL_SLIDES}
+            width={width}
+            isFav={(id) => favs.includes(id)}
+            onToggleFav={toggleFav}
+            onOpen={openDetails}
+            tint={tint}
           />
-          <View style={styles.heroOverlay} />
+        </View>
 
-          <View style={styles.heroContent}>
-            <Text style={styles.heroTitle}>Explore Nepal</Text>
-            <Text style={styles.heroSubtitle}>
-              Mountains, culture, and once-in-a-lifetime adventures.
-            </Text>
+        {/* ============================== SEARCH + QUICK ============================== */}
+        <View style={{ paddingHorizontal: 16, marginTop: 8 }}>
+          <View style={styles.searchBar}>
+            <IconSymbol name="magnifyingglass" size={18} color="#6b7280" />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search places, treks, or festivals"
+              placeholderTextColor="#9ca3af"
+              value={search}
+              onChangeText={setSearch}
+              returnKeyType="search"
+            />
+          </View>
 
-            <View style={styles.searchBar}>
-              <IconSymbol name="magnifyingglass" size={18} color="#6b7280" />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search places, treks, or festivals"
-                placeholderTextColor="#9ca3af"
-                value={search}
-                onChangeText={setSearch}
-                returnKeyType="search"
-              />
-            </View>
-
-            {/* Quick Actions */}
-            <View style={styles.quickRow}>
-              <QuickAction icon="map" label="Itinerary" onPress={() => go('/itineraries')} />
-              <QuickAction icon="sparkles" label="Festivals" onPress={() => go('/festivals')} />
-              <QuickAction icon="mappin.and.ellipse" label="Top Places" onPress={() => go('/top-places')} />
-              {/* ✅ FIX: Discover tab is app/(tabs)/Discover.tsx (capital D) */}
-              <QuickAction icon="binoculars" label="Discover" onPress={() => go('/(tabs)/Discover')} />
-            </View>
+          <View style={styles.quickRow}>
+            <QuickAction icon="map" label="Itinerary" onPress={() => router.push('/itineraries' as any)} />
+            <QuickAction icon="sparkles" label="Festivals" onPress={() => router.push('/festivals' as any)} />
+            <QuickAction icon="mappin.and.ellipse" label="Top Places" onPress={goDiscover} />
+            <QuickAction icon="heart" label="Favourites" onPress={goFavourites} />
           </View>
         </View>
 
         {/* ============================ TOP PLACES =========================== */}
-        <SectionHeader title="Top Places" actionLabel="View all" onAction={() => go('/top-places')} />
+        <SectionHeader title="Top Places" actionLabel="View all" onAction={goDiscover} />
         <FlatList
-          data={filteredPlaces}
+          data={filterPlaces(TOP_PLACES)}
           keyExtractor={(item) => item.id}
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 16 }}
           renderItem={({ item }) => (
-            <View style={[styles.placeCard, { width: cardWidth }]}>
-              <Pressable
-                onPress={() => onPlacePress(item.id, item.title)}
-                style={{ borderRadius: 12, overflow: 'hidden' }}
-              >
-                <Image source={item.image} style={{ width: cardWidth, height: cardHeight }} />
-              </Pressable>
-              <Text style={styles.placeTitle}>{item.title}</Text>
-            </View>
+            <PlaceCard
+              item={item}
+              width={cardW}
+              height={cardH}
+              isFav={favs.includes(item.id)}
+              onFav={() => toggleFav(item.id)}
+              onOpen={() => openDetails(item.id)}
+              tint={tint}
+            />
+          )}
+        />
+
+        {/* ============================ ADVENTURE ============================ */}
+        <SectionHeader title="Adventure" actionLabel="Browse" onAction={goDiscover} />
+        <FlatList
+          data={filterPlaces(ADVENTURE)}
+          keyExtractor={(item) => item.id}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 16 }}
+          renderItem={({ item }) => (
+            <PlaceCard
+              item={item}
+              width={cardW}
+              height={cardH}
+              isFav={favs.includes(item.id)}
+              onFav={() => toggleFav(item.id)}
+              onOpen={() => openDetails(item.id)}
+              tint={tint}
+            />
+          )}
+        />
+
+        {/* ============================== CULTURE ============================ */}
+        <SectionHeader title="Culture" actionLabel="Browse" onAction={goDiscover} />
+        <FlatList
+          data={filterPlaces(CULTURE)}
+          keyExtractor={(item) => item.id}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 16 }}
+          renderItem={({ item }) => (
+            <PlaceCard
+              item={item}
+              width={cardW}
+              height={cardH}
+              isFav={favs.includes(item.id)}
+              onFav={() => toggleFav(item.id)}
+              onOpen={() => openDetails(item.id)}
+              tint={tint}
+            />
           )}
         />
 
         {/* ========================= FESTIVAL CALENDAR ======================= */}
-        <SectionHeader title="Festival Calendar" actionLabel="See calendar" onAction={() => go('/festivals')} />
+        <SectionHeader title="Festival Calendar" actionLabel="See calendar" onAction={() => router.push('/festivals' as any)} />
         <FlatList
           data={FESTIVALS}
           keyExtractor={(f) => f.id}
@@ -168,35 +225,42 @@ export default function HomeScreen() {
           contentContainerStyle={{ paddingHorizontal: 16 }}
           renderItem={({ item }) => <FestivalPill festival={item} />}
         />
+{/* ========================= MINI ITINERARIES ======================== */}
+<SectionHeader
+  title="Mini Itineraries"
+  actionLabel="Browse itineraries"
+  onAction={() => router.push('/itineraries')}
+/>
 
-        {/* ========================= MINI ITINERARIES ======================== */}
-        <SectionHeader title="Mini Itineraries" actionLabel="Browse itineraries" onAction={() => go('/itineraries')} />
-        <View style={styles.itineraryList}>
-          {ITINERARIES.map((it) => (
-            <Pressable key={it.id} onPress={() => go(`/itineraries/${it.id}`)} style={styles.itineraryCard}>
-              <Image source={it.cover} style={styles.itineraryCover} />
-              <View style={styles.itineraryInfo}>
-                <Text style={styles.itineraryTitle}>{it.title}</Text>
-                <Text style={styles.itineraryMeta}>{it.days} days • {it.highlights[0]}</Text>
-                <View style={styles.itineraryChips}>
-                  {it.highlights.slice(0, 3).map((h, i) => (
-                    <View key={i} style={styles.chip}>
-                      <Text style={styles.chipText}>{h}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-              <IconSymbol name="chevron.right" size={18} color="#9ca3af" />
-            </Pressable>
+<View style={styles.itineraryList}>
+  {ITINERARIES.map((it) => (
+    <Pressable
+      key={it.id}
+      onPress={() => router.push({ pathname: '/itineraries/[id]', params: { id: it.id } })}
+      style={styles.itineraryCard}
+    >
+      <Image source={it.cover} style={styles.itineraryCover} />
+      <View style={styles.itineraryInfo}>
+        <Text style={styles.itineraryTitle}>{it.title}</Text>
+        <Text style={styles.itineraryMeta}>{it.days} days • {it.highlights[0]}</Text>
+        <View style={styles.itineraryChips}>
+          {it.highlights.slice(0, 3).map((h, i) => (
+            <View key={i} style={styles.chip}>
+              <Text style={styles.chipText}>{h}</Text>
+            </View>
           ))}
         </View>
-
+      </View>
+      <IconSymbol name="chevron.right" size={18} color="#9ca3af" />
+    </Pressable>
+  ))}
+</View>
         {/* ============================== CTA =============================== */}
         <View style={styles.cta}>
           <Text style={styles.ctaText}>Ready to plan your trip?</Text>
           <Pressable
-            style={[styles.primaryBtn, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}
-            onPress={() => go('/itineraries')}
+            style={[styles.primaryBtn, { backgroundColor: tint }]}
+            onPress={() => router.push('/itineraries' as any)}
           >
             <Text style={styles.primaryBtnText}>Build My Itinerary</Text>
           </Pressable>
@@ -206,17 +270,96 @@ export default function HomeScreen() {
   );
 }
 
+/* ------------------------------ Carousel ------------------------------ */
+
+function TopCarousel({
+  slides,
+  width,
+  isFav,
+  onToggleFav,
+  onOpen,
+  tint,
+}: {
+  slides: Place[];
+  width: number;
+  isFav: (id: string) => boolean;
+  onToggleFav: (id: string) => void;
+  onOpen: (id: string) => void;
+  tint: string;
+}) {
+  const carouselRef = useRef<ICarouselInstance | null>(null);
+  const sliderW = width;
+  const sliderH = Math.max(180, Math.min(260, width * 0.55)); // responsive height
+
+  return (
+    <Carousel
+      ref={carouselRef}
+      width={sliderW}
+      height={sliderH}
+      data={slides}
+      loop
+      autoPlay
+      autoPlayInterval={3000}
+      pagingEnabled
+      scrollAnimationDuration={700}
+      renderItem={({ item, index, animationValue }) => {
+        // subtle scale on center item
+        const style = useAnimatedStyle(() => {
+          return {
+            transform: [
+              {
+                scale: interpolate(
+                  animationValue.value,
+                  [-1, 0, 1],
+                  [0.92, 1, 0.92],
+                  Extrapolation.CLAMP
+                ),
+              },
+            ],
+          };
+        });
+
+        return (
+          <Animated.View style={[styles.slideCard, style]}>
+            <Pressable onPress={() => onOpen(item.id)} style={{ flex: 1, borderRadius: 16, overflow: 'hidden' }}>
+              <Image source={item.image} style={{ width: '100%', height: '100%' }} />
+              <View style={styles.slideOverlay} />
+              <View style={styles.slideContent}>
+                <Text style={styles.slideTitle}>{item.title}</Text>
+                {!!item.location && (
+                  <View style={styles.slideLocRow}>
+                    <IconSymbol name="mappin.and.ellipse" size={12} color="#fff" />
+                    <Text style={styles.slideLocText}>{item.location}</Text>
+                  </View>
+                )}
+              </View>
+            </Pressable>
+
+            <Pressable
+              onPress={() => onToggleFav(item.id)}
+              style={styles.slideHeart}
+              hitSlop={8}
+            >
+              <IconSymbol
+                name={isFav(item.id) ? 'heart.fill' : 'heart'}
+                size={22}
+                color={isFav(item.id) ? tint : '#111827'}
+              />
+            </Pressable>
+          </Animated.View>
+        );
+      }}
+    />
+  );
+}
+
 /* ------------------------------ Reusables ------------------------------ */
 
 function SectionHeader({
   title,
   actionLabel,
   onAction,
-}: {
-  title: string;
-  actionLabel?: string;
-  onAction?: () => void;
-}) {
+}: { title: string; actionLabel?: string; onAction?: () => void }) {
   return (
     <View style={styles.sectionHeaderRow}>
       <Text style={styles.sectionTitle}>{title}</Text>
@@ -248,6 +391,46 @@ function QuickAction({
   );
 }
 
+function PlaceCard({
+  item,
+  width,
+  height,
+  isFav,
+  onFav,
+  onOpen,
+  tint,
+}: {
+  item: Place;
+  width: number;
+  height: number;
+  isFav: boolean;
+  onFav: () => void;
+  onOpen: () => void;
+  tint: string;
+}) {
+  return (
+    <View style={[styles.placeCard, { width }]}>
+      <Pressable onPress={onOpen} style={{ borderRadius: 14, overflow: 'hidden' }}>
+        <Image source={item.image} style={{ width, height }} />
+        <View style={styles.placeGradient} />
+        <View style={styles.placeTitleRow}>
+          <Text style={styles.placeTitleText}>{item.title}</Text>
+          {item.location ? (
+            <View style={styles.placeLocRow}>
+              <IconSymbol name="mappin.and.ellipse" size={12} color="#fff" />
+              <Text style={styles.placeLocText}>{item.location}</Text>
+            </View>
+          ) : null}
+        </View>
+      </Pressable>
+
+      <Pressable onPress={onFav} style={styles.heartBtn} hitSlop={8}>
+        <IconSymbol name={isFav ? 'heart.fill' : 'heart'} size={22} color={isFav ? tint : '#111827'} />
+      </Pressable>
+    </View>
+  );
+}
+
 function FestivalPill({ festival }: { festival: Festival }) {
   return (
     <View style={styles.festivalPill}>
@@ -265,55 +448,115 @@ function FestivalPill({ festival }: { festival: Festival }) {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#f8fafc' },
-  scrollBody: { paddingBottom: 40 },
+  scrollBody: { paddingBottom: 48 },
 
-  /* HERO */
-  hero: { position: 'relative', width: '100%', aspectRatio: 2 },
-  heroImage: { width: '100%', height: '100%' },
-  heroOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.25)' },
-  heroContent: { position: 'absolute', left: 16, right: 16, bottom: 16, gap: 12 },
-  heroTitle: { color: '#fff', fontSize: 28, fontWeight: '800' },
-  heroSubtitle: { color: '#e5e7eb', fontSize: 14 },
-
+  /* SEARCH + QUICK */
   searchBar: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: '#ffffff', borderRadius: 999,
-    paddingHorizontal: 12, paddingVertical: 10,
-    shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 }, elevation: 3,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#ffffff',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
   },
   searchInput: { flex: 1, paddingVertical: 0, color: '#111827' },
 
-  quickRow: { flexDirection: 'row', gap: 12, marginTop: 4 },
+  quickRow: { flexDirection: 'row', gap: 12, marginTop: 12 },
   quick: {
-    flex: 1, alignItems: 'center', backgroundColor: '#ffffff',
-    borderRadius: 12, paddingVertical: 12, gap: 6,
-    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 }, elevation: 2,
+    flex: 1, alignItems: 'center', backgroundColor: '#ffffff', borderRadius: 12, paddingVertical: 12, gap: 6,
+    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2,
   },
   quickIconWrap: { backgroundColor: '#f3f4f6', padding: 8, borderRadius: 999 },
   quickLabel: { fontSize: 12, fontWeight: '600', color: '#111827' },
 
   /* SECTION HEADER */
   sectionHeaderRow: {
-    paddingHorizontal: 16, marginTop: 24, marginBottom: 12,
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end',
+    paddingHorizontal: 16, marginTop: 24, marginBottom: 12, flexDirection: 'row',
+    justifyContent: 'space-between', alignItems: 'flex-end',
   },
   sectionTitle: { fontSize: 20, fontWeight: '800', color: '#111827' },
   sectionAction: { color: '#2563eb', fontWeight: '700' },
 
-  /* TOP PLACES */
-  placeCard: {
-    backgroundColor: '#fff', borderRadius: 12, marginRight: 16, paddingBottom: 10,
-    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2,
+  /* CAROUSEL */
+  slideCard: {
+    flex: 1,
+    marginHorizontal: 12,
+    borderRadius: 16,
+    backgroundColor: '#fff',
+    overflow: 'visible',
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
   },
-  placeTitle: { marginTop: 10, paddingHorizontal: 8, fontSize: 16, fontWeight: '700', color: '#111827' },
+  slideOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.25)' },
+  slideContent: { position: 'absolute', left: 14, right: 14, bottom: 14 },
+  slideTitle: { color: '#fff', fontSize: 20, fontWeight: '800' },
+  slideLocRow: { marginTop: 6, flexDirection: 'row', gap: 6, alignItems: 'center' },
+  slideLocText: { color: '#e5e7eb', fontSize: 12 },
+  slideHeart: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    borderRadius: 999,
+    padding: 6,
+  },
+
+  /* PLACE CARD */
+  placeCard: {
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    marginRight: 16,
+    paddingBottom: 10,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+    overflow: 'visible',
+  },
+  heartBtn: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderRadius: 999,
+    padding: 6,
+  },
+  placeGradient: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 68,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  placeTitleRow: { position: 'absolute', bottom: 10, left: 10, right: 10 },
+  placeTitleText: { color: '#fff', fontWeight: '800', fontSize: 16 },
+  placeLocRow: { marginTop: 4, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  placeLocText: { color: '#e5e7eb', fontSize: 12 },
 
   /* FESTIVAL PILL */
   festivalPill: {
-    backgroundColor: '#ffffff', borderRadius: 12, paddingVertical: 10, paddingHorizontal: 12,
-    marginRight: 12, minWidth: 140, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 }, elevation: 2,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginRight: 12,
+    minWidth: 140,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
   festivalDate: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   festivalDateText: { fontWeight: '800', color: '#111827' },
@@ -323,9 +566,17 @@ const styles = StyleSheet.create({
   /* ITINERARIES */
   itineraryList: { paddingHorizontal: 16, gap: 12 },
   itineraryCard: {
-    backgroundColor: '#fff', borderRadius: 12, padding: 10, flexDirection: 'row',
-    alignItems: 'center', gap: 10, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 }, elevation: 2,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
   itineraryCover: { width: 72, height: 72, borderRadius: 8 },
   itineraryInfo: { flex: 1 },
