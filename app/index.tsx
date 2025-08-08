@@ -141,6 +141,7 @@ const styles = StyleSheet.create({
 
 // app/index.tsx
 
+// app/index.tsx
 import { useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import { ActivityIndicator, Platform, View } from 'react-native';
@@ -149,17 +150,12 @@ export default function Index() {
   const router = useRouter();
 
   useEffect(() => {
-    // For web, wait for a frame before redirecting
+    const go = () => router.replace('/(tabs)/homeScreen');
     if (Platform.OS === 'web') {
-      window.requestAnimationFrame(() => {
-        router.replace('/loginPage');
-      });
+      window.requestAnimationFrame(go);
     } else {
-      // Mobile can redirect after short timeout
-      const timeout = setTimeout(() => {
-        router.replace('/loginPage');
-      }, 100);
-      return () => clearTimeout(timeout);
+      const t = setTimeout(go, 100);
+      return () => clearTimeout(t);
     }
   }, []);
 
