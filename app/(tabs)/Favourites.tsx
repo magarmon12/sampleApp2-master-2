@@ -1,110 +1,122 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+// app/(tabs)/favourite.tsx
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { View, Text, FlatList, RefreshControl, StyleSheet, ActivityIndicator } from "react-native";
+import FavoriteCard from "components/FavoriteCard";
+import { useAppwriteUser } from "hooks/useAppwriteUser";
+import { FavoriteDoc, listFavoritesByUser, removeFavoriteById } from "lib/favorites";
+import { IDs, subscribe } from "lib/appwrite";
 
-import { Collapsible } from '@/components/Collapsible';
-import { ExternalLink } from '@/components/ExternalLink';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
-import { IconSymbol } from '@/components/ui/IconSymbol';
+export default function FavouriteScreen() {
+  const { user, loading } = useAppwriteUser();
+  const [items, setItems] = useState<FavoriteDoc[]>([]);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const unsubRef = useRef<null | (() => void)>(null);
 
-export default function TabTwoScreen() {
+  const load = useCallback(async () => {
+    if (!user) return;
+    const docs = await listFavoritesByUser(user.$id);
+    setItems(docs);
+  }, [user]);
+
+  // Initial fetch
+  useEffect(() => {
+    if (loading) return;
+    if (!user) {
+      setItems([]);
+      setInitialLoading(false);
+      return;
+    }
+    (async () => {
+      await load();
+      setInitialLoading(false);
+    })();
+  }, [loading, user, load]);
+
+  // Realtime subscription
+  useEffect(() => {
+    if (!user) return;
+
+    const unsubscribe = subscribe(
+      `databases.${IDs.databaseId}.collections.${IDs.favoritesColId}.documents`,
+      (event: any) => {
+        const doc = event.payload as FavoriteDoc;
+        if (!doc || doc.userId !== user.$id) return;
+
+        if (event.events.some((e: string) => e.endsWith(".create"))) {
+          setItems(prev => (prev.find(d => d.$id === doc.$id) ? prev : [doc, ...prev]));
+        } else if (event.events.some((e: string) => e.endsWith(".update"))) {
+          setItems(prev => prev.map(d => (d.$id === doc.$id ? doc : d)));
+        } else if (event.events.some((e: string) => e.endsWith(".delete"))) {
+          setItems(prev => prev.filter(d => d.$id !== doc.$id));
+        }
+      }
+    );
+
+    unsubRef.current = unsubscribe;
+    return () => { try { unsubRef.current?.(); } catch {} };
+  }, [user]);
+
+  const onRefresh = useCallback(async () => {
+    if (!user) return;
+    setRefreshing(true);
+    try { await load(); } finally { setRefreshing(false); }
+  }, [user, load]);
+
+  const handleDelete = useCallback(async (docId: string) => {
+    const prev = items;
+    setItems(cur => cur.filter(i => i.$id !== docId)); // optimistic UI
+    try {
+      await removeFavoriteById(docId);
+      // realtime ".delete" will also arrive
+    } catch {
+      setItems(prev); // rollback if API fails
+    }
+  }, [items]);
+
+  if (loading || initialLoading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator />
+        <Text style={{ marginTop: 8 }}>Loading favourites…</Text>
+      </View>
+    );
+  }
+
+  if (!user) {
+    return (
+      <View style={styles.center}>
+        <Text>Please log in to see your favourites.</Text>
+      </View>
+    );
+  }
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
-      headerImage={
-        <IconSymbol
-          size={310}
-          color="#808080"
-          name="chevron.left.forwardslash.chevron.right"
-          style={styles.headerImage}
+    <View style={styles.container}>
+      <Text style={styles.h1}>Your Favourites</Text>
+
+      {items.length === 0 ? (
+        <View style={styles.center}>
+          <Text>No favourites yet.</Text>
+          <Text style={{ color: "#777" }}>Add some places to see them here.</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={items}
+          keyExtractor={(item) => item.$id}
+          renderItem={({ item }) => (
+            <FavoriteCard item={item} onDelete={handleDelete} />
+          )}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          contentContainerStyle={{ paddingBottom: 32 }}
         />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Explore</ThemedText>
-      </ThemedView>
-      <ThemedText>This app includes example code to help you get started.</ThemedText>
-      <Collapsible title="File-based routing">
-        <ThemedText>
-          This app has two screens:{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/explore.tsx</ThemedText>
-        </ThemedText>
-        <ThemedText>
-          The layout file in <ThemedText type="defaultSemiBold">app/(tabs)/_layout.tsx</ThemedText>{' '}
-          sets up the tab navigator.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/router/introduction">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Android, iOS, and web support">
-        <ThemedText>
-          You can open this project on Android, iOS, and the web. To open the web version, press{' '}
-          <ThemedText type="defaultSemiBold">w</ThemedText> in the terminal running this project.
-        </ThemedText>
-      </Collapsible>
-      <Collapsible title="Images">
-        <ThemedText>
-          For static images, you can use the <ThemedText type="defaultSemiBold">@2x</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">@3x</ThemedText> suffixes to provide files for
-          different screen densities
-        </ThemedText>
-        <Image source={require('@/assets/images/react-logo.png')} style={{ alignSelf: 'center' }} />
-        <ExternalLink href="https://reactnative.dev/docs/images">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Custom fonts">
-        <ThemedText>
-          Open <ThemedText type="defaultSemiBold">app/_layout.tsx</ThemedText> to see how to load{' '}
-          <ThemedText style={{ fontFamily: 'SpaceMono' }}>
-            custom fonts such as this one.
-          </ThemedText>
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/versions/latest/sdk/font">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Light and dark mode components">
-        <ThemedText>
-          This template has light and dark mode support. The{' '}
-          <ThemedText type="defaultSemiBold">useColorScheme()</ThemedText> hook lets you inspect
-          what the user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Animations">
-        <ThemedText>
-          This template includes an example of an animated component. The{' '}
-          <ThemedText type="defaultSemiBold">components/HelloWave.tsx</ThemedText> component uses
-          the powerful <ThemedText type="defaultSemiBold">react-native-reanimated</ThemedText>{' '}
-          library to create a waving hand animation.
-        </ThemedText>
-        {Platform.select({
-          ios: (
-            <ThemedText>
-              The <ThemedText type="defaultSemiBold">components/ParallaxScrollView.tsx</ThemedText>{' '}
-              component provides a parallax effect for the header image.
-            </ThemedText>
-          ),
-        })}
-      </Collapsible>
-    </ParallaxScrollView>
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  headerImage: {
-    color: '#808080',
-    bottom: -90,
-    left: -35,
-    position: 'absolute',
-  },
-  titleContainer: {
-    flexDirection: 'row',
-    gap: 8,
-  },
+  container: { flex: 1, backgroundColor: "#fafafa", paddingTop: 8 },
+  h1: { fontSize: 22, fontWeight: "800", marginHorizontal: 16, marginBottom: 4 },
+  center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 16 },
 });
