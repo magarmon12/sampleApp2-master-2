@@ -4,7 +4,6 @@ import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useRouter } from 'expo-router';
 
-
 import React, { useCallback, useRef, useState } from 'react';
 import {
   FlatList,
@@ -27,30 +26,30 @@ type Festival = { id: string; name: string; date: string; city: string };
 type Itinerary = { id: string; title: string; days: number; highlights: string[]; cover: any };
 
 const TOP_PLACES: Place[] = [
-  { id: 'kalinchowk', title: 'Kalinchowk', image: require('../../assets/images/HomeKalinchowk.jpg'), location: 'Dolakha' },
-  { id: 'pokhara', title: 'Pokhara Lakeside', image: require('../../assets/images/HomePokhara.jpg'), location: 'Pokhara' },
-  { id: 'nagarkot', title: 'Nagarkot Sunrise', image: require('../../assets/images/HomeNagarkot.jpg'), location: 'Nagarkot' },
+  { id: 'kalinchowk', title: 'Kalinchowk', image: require('../assets/images/HomeKalinchowk.jpg'), location: 'Dolakha' },
+  { id: 'pokhara', title: 'Pokhara Lakeside', image: require('../assets/images/HomePokhara.jpg'), location: 'Pokhara' },
+  { id: 'nagarkot', title: 'Nagarkot Sunrise', image: require('../assets/images/HomeNagarkot.jpg'), location: 'Nagarkot' },
 ];
 
 const ADVENTURE: Place[] = [
-  { id: 'bungee', title: 'Bungee Jumping', image: require('../../assets/images/HomeBungee.jpg'), location: 'Kushma' },
-  { id: 'zipline', title: 'Zip Lining', image: require('../../assets/images/HomeZipline.jpg'), location: 'Pokhara' },
-  { id: 'skydiving', title: 'Skydiving', image: require('../../assets/images/HomeSkydiving.jpg'), location: 'Pokhara' },
-  { id: 'rafting', title: 'White Water Rafting', image: require('../../assets/images/Homerafting.jpg'), location: 'Trishuli' },
+  { id: 'bungee',   title: 'Bungee Jumping',        image: require('../assets/images/HomeBungee.jpg'),      location: 'Kushma' },
+  { id: 'zipline',  title: 'Zip Lining',            image: require('../assets/images/HomeZipline.jpg'),     location: 'Pokhara' },
+  { id: 'skydiving',title: 'Skydiving',             image: require('../assets/images/HomeSkydiving.jpg'),   location: 'Pokhara' },
+  { id: 'rafting',  title: 'White Water Rafting',   image: require('../assets/images/Homerafting.jpg'),     location: 'Trishuli' },
 ];
 
 const CULTURE: Place[] = [
-  { id: 'pashupatinath', title: 'Pashupatinath Temple', image: require('../../assets/images/HomePashupatinath.jpg'), location: 'Kathmandu' },
-  { id: 'bouddha', title: 'Bouddhanath Stupa', image: require('../../assets/images/HomeBouddha.jpg'), location: 'Kathmandu' },
-  { id: 'bhaktapur', title: 'Art Bhaktapur', image: require('../../assets/images/HomeBhaktapur.jpg'), location: 'Bhaktapur' },
-  { id: 'lumbini', title: 'Lumbini', image: require('../../assets/images/HomeLumbini.jpg'), location: 'Rupandehi' },
+  { id: 'pashupatinath', title: 'Pashupatinath Temple', image: require('../assets/images/HomePashupatinath.jpg'), location: 'Kathmandu' },
+  { id: 'bouddha',       title: 'Bouddhanath Stupa',    image: require('../assets/images/HomeBouddha.jpg'),        location: 'Kathmandu' },
+  { id: 'bhaktapur',     title: 'Art Bhaktapur',        image: require('../assets/images/HomeBhaktapur.jpg'),      location: 'Bhaktapur' },
+  { id: 'lumbini',       title: 'Lumbini',              image: require('../assets/images/HomeLumbini.jpg'),        location: 'Rupandehi' },
 ];
 
 const FESTIVALS: Festival[] = [
   { id: 'dashain', name: 'Dashain', date: 'Oct 10', city: 'Kathmandu' },
-  { id: 'tihar', name: 'Tihar', date: 'Nov 3', city: 'Bhaktapur' },
-  { id: 'holi', name: 'Holi', date: 'Mar 22', city: 'Pokhara' },
-  { id: 'losar', name: 'Losar', date: 'Feb 9', city: 'Boudha' },
+  { id: 'tihar',   name: 'Tihar',   date: 'Nov 3',  city: 'Bhaktapur' },
+  { id: 'holi',    name: 'Holi',    date: 'Mar 22', city: 'Pokhara' },
+  { id: 'losar',   name: 'Losar',   date: 'Feb 9',  city: 'Boudha' },
 ];
 
 const ITINERARIES: Itinerary[] = [
@@ -59,29 +58,29 @@ const ITINERARIES: Itinerary[] = [
     title: '3-Day Kathmandu Heritage',
     days: 3,
     highlights: ['Pashupatinath', 'Boudhanath', 'Bhaktapur'],
-    cover: require('../../assets/images/HomeBhaktapur.jpg'),
+    cover: require('../assets/images/HomeBhaktapur.jpg'),
   },
   {
     id: 'pkr5',
     title: '5-Day Pokhara & Annapurna',
     days: 5,
     highlights: ['Phewa Lake', 'Sarangkot', 'Australian Camp'],
-    cover: require('../../assets/images/HomePokhara.jpg'),
+    cover: require('../assets/images/HomePokhara.jpg'),
   },
   {
     id: 'east4',
     title: '4-Day Kalinchowk & Dolakha',
     days: 4,
     highlights: ['Kalinchowk', 'Local Temples', 'Snow Walks'],
-    cover: require('../../assets/images/HomeKalinchowk.jpg'),
+    cover: require('../assets/images/HomeKalinchowk.jpg'),
   },
 ];
 
-// Slides for the top carousel (you can mix any highlights you want)
+// Slides for the top carousel
 const CAROUSEL_SLIDES: Place[] = [
-  { id: 'pokhara', title: 'Sunrise over Phewa', image: require('../../assets/images/HomePokhara.jpg'), location: 'Pokhara' },
-  { id: 'kalinchowk', title: 'Snowy Kalinchowk', image: require('../../assets/images/HomeKalinchowk.jpg'), location: 'Dolakha' },
-  { id: 'bhaktapur', title: 'Bhaktapur Heritage', image: require('../../assets/images/HomeBhaktapur.jpg'), location: 'Bhaktapur' },
+  { id: 'pokhara',    title: 'Sunrise over Phewa',  image: require('../assets/images/HomePokhara.jpg'),    location: 'Pokhara' },
+  { id: 'kalinchowk', title: 'Snowy Kalinchowk',    image: require('../assets/images/HomeKalinchowk.jpg'), location: 'Dolakha' },
+  { id: 'bhaktapur',  title: 'Bhaktapur Heritage',  image: require('../assets/images/HomeBhaktapur.jpg'),  location: 'Bhaktapur' },
 ];
 
 /* --------------------------------- Screen -------------------------------- */
@@ -100,8 +99,7 @@ export default function HomeScreen() {
 
   // Search filter
   const filterPlaces = useCallback(
-    (list: Place[]) =>
-      list.filter((p) => p.title.toLowerCase().includes(search.trim().toLowerCase())),
+    (list: Place[]) => list.filter((p) => p.title.toLowerCase().includes(search.trim().toLowerCase())),
     [search]
   );
 
@@ -112,8 +110,7 @@ export default function HomeScreen() {
   const tint = Colors[colorScheme ?? 'light'].tint;
 
   // Navigation helpers — only to existing routes in your tree
-  const openDetails = (id: string) =>
-    router.push({ pathname: '/location-details', params: { id } });
+  const openDetails = (id: string) => router.push({ pathname: '/location-details', params: { id } });
   const goDiscover = () => router.push('/(tabs)/Discover');
   const goFavourites = () => router.push('/(tabs)/Favourites');
 
@@ -219,54 +216,55 @@ export default function HomeScreen() {
 
         {/* ========================= FESTIVAL CALENDAR ======================= */}
         <SectionHeader
-  title="Festival Calendar"
-  actionLabel="See calendar"
-  onAction={() => router.push('/festivals' as any)}
-/>
+          title="Festival Calendar"
+          actionLabel="See calendar"
+          onAction={() => router.push('/festivals' as any)}
+        />
 
-<FlatList
-  data={FESTIVALS}
-  keyExtractor={(f) => f.id}
-  horizontal
-  showsHorizontalScrollIndicator={false}
-  contentContainerStyle={{ paddingHorizontal: 16 }}
-  renderItem={({ item }) => (
-    <Pressable onPress={() => router.push(`/festivals/${item.id}` as any)}>
-      <FestivalPill festival={item} />
-    </Pressable>
-  )}
-/>
-        
-{/* ========================= MINI ITINERARIES ======================== */}
-<SectionHeader
-  title="Mini Itineraries"
-  actionLabel="Browse itineraries"
-  onAction={() => router.push('/itineraries')}
-/>
+        <FlatList
+          data={FESTIVALS}
+          keyExtractor={(f) => f.id}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 16 }}
+          renderItem={({ item }) => (
+            <Pressable onPress={() => router.push(`/festivals/${item.id}` as any)}>
+              <FestivalPill festival={item} />
+            </Pressable>
+          )}
+        />
 
-<View style={styles.itineraryList}>
-  {ITINERARIES.map((it) => (
-    <Pressable
-      key={it.id}
-      onPress={() => router.push({ pathname: '/itineraries/[id]', params: { id: it.id } })}
-      style={styles.itineraryCard}
-    >
-      <Image source={it.cover} style={styles.itineraryCover} />
-      <View style={styles.itineraryInfo}>
-        <Text style={styles.itineraryTitle}>{it.title}</Text>
-        <Text style={styles.itineraryMeta}>{it.days} days • {it.highlights[0]}</Text>
-        <View style={styles.itineraryChips}>
-          {it.highlights.slice(0, 3).map((h, i) => (
-            <View key={i} style={styles.chip}>
-              <Text style={styles.chipText}>{h}</Text>
-            </View>
+        {/* ========================= MINI ITINERARIES ======================== */}
+        <SectionHeader
+          title="Mini Itineraries"
+          actionLabel="Browse itineraries"
+          onAction={() => router.push('/itineraries')}
+        />
+
+        <View style={styles.itineraryList}>
+          {ITINERARIES.map((it) => (
+            <Pressable
+              key={it.id}
+              onPress={() => router.push({ pathname: '/itineraries/[id]', params: { id: it.id } })}
+              style={styles.itineraryCard}
+            >
+              <Image source={it.cover} style={styles.itineraryCover} />
+              <View style={styles.itineraryInfo}>
+                <Text style={styles.itineraryTitle}>{it.title}</Text>
+                <Text style={styles.itineraryMeta}>{it.days} days • {it.highlights[0]}</Text>
+                <View style={styles.itineraryChips}>
+                  {it.highlights.slice(0, 3).map((h, i) => (
+                    <View key={i} style={styles.chip}>
+                      <Text style={styles.chipText}>{h}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+              <IconSymbol name="chevron.right" size={18} color="#9ca3af" />
+            </Pressable>
           ))}
         </View>
-      </View>
-      <IconSymbol name="chevron.right" size={18} color="#9ca3af" />
-    </Pressable>
-  ))}
-</View>
+
         {/* ============================== CTA =============================== */}
         <View style={styles.cta}>
           <Text style={styles.ctaText}>Ready to plan your trip?</Text>
@@ -315,21 +313,18 @@ function TopCarousel({
       pagingEnabled
       scrollAnimationDuration={700}
       renderItem={({ item, index, animationValue }) => {
-        // subtle scale on center item
-        const style = useAnimatedStyle(() => {
-          return {
-            transform: [
-              {
-                scale: interpolate(
-                  animationValue.value,
-                  [-1, 0, 1],
-                  [0.92, 1, 0.92],
-                  Extrapolation.CLAMP
-                ),
-              },
-            ],
-          };
-        });
+        const style = useAnimatedStyle(() => ({
+          transform: [
+            {
+              scale: interpolate(
+                animationValue.value,
+                [-1, 0, 1],
+                [0.92, 1, 0.92],
+                Extrapolation.CLAMP
+              ),
+            },
+          ],
+        }));
 
         return (
           <Animated.View style={[styles.slideCard, style]}>
@@ -347,11 +342,7 @@ function TopCarousel({
               </View>
             </Pressable>
 
-            <Pressable
-              onPress={() => onToggleFav(item.id)}
-              style={styles.slideHeart}
-              hitSlop={8}
-            >
+            <Pressable onPress={() => onToggleFav(item.id)} style={styles.slideHeart} hitSlop={8}>
               <IconSymbol
                 name={isFav(item.id) ? 'heart.fill' : 'heart'}
                 size={22}
