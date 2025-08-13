@@ -1,11 +1,8 @@
 // app/(tabs)/homeScreen.tsx
-import { IconSymbol } from '@/components/ui/IconSymbol';
-import { Colors } from '@/constants/Colors';
-import { useColorScheme } from '@/hooks/useColorScheme';
 import { useRouter } from 'expo-router';
-
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   FlatList,
   Image,
   Pressable,
@@ -20,22 +17,34 @@ import {
 import Animated, { Extrapolation, interpolate, useAnimatedStyle } from 'react-native-reanimated';
 import Carousel, { ICarouselInstance } from 'react-native-reanimated-carousel';
 
-/* ----------------------------- Mocked Content ----------------------------- */
+import { IconSymbol } from '@/components/ui/IconSymbol';
+import { Colors } from '@/constants/Colors';
+import { useAppwriteUser } from '@/hooks/useAppwriteUser';
+import { useColorScheme } from '@/hooks/useColorScheme';
+import {
+  getFavoriteByUserPlace,
+  listFavoritesByUser,
+  removeFavoriteById,
+  toggleFavoriteApi, // ← correct export
+} from '@/lib/favorites';
+
+/* ----------------------------- Types & Data ----------------------------- */
+
 type Place = { id: string; title: string; image: any; location?: string };
 type Festival = { id: string; name: string; date: string; city: string };
 type Itinerary = { id: string; title: string; days: number; highlights: string[]; cover: any };
 
 const TOP_PLACES: Place[] = [
-  { id: 'kalinchowk', title: 'Kalinchowk', image: require('../assets/images/HomeKalinchowk.jpg'), location: 'Dolakha' },
-  { id: 'pokhara', title: 'Pokhara Lakeside', image: require('../assets/images/HomePokhara.jpg'), location: 'Pokhara' },
-  { id: 'nagarkot', title: 'Nagarkot Sunrise', image: require('../assets/images/HomeNagarkot.jpg'), location: 'Nagarkot' },
+  { id: 'kalinchowk', title: 'Kalinchowk',         image: require('../assets/images/HomeKalinchowk.jpg'),  location: 'Dolakha' },
+  { id: 'pokhara',    title: 'Pokhara Lakeside',   image: require('../assets/images/HomePokhara.jpg'),      location: 'Pokhara' },
+  { id: 'nagarkot',   title: 'Nagarkot Sunrise',   image: require('../assets/images/HomeNagarkot.jpg'),     location: 'Nagarkot' },
 ];
 
 const ADVENTURE: Place[] = [
-  { id: 'bungee',   title: 'Bungee Jumping',        image: require('../assets/images/HomeBungee.jpg'),      location: 'Kushma' },
-  { id: 'zipline',  title: 'Zip Lining',            image: require('../assets/images/HomeZipline.jpg'),     location: 'Pokhara' },
-  { id: 'skydiving',title: 'Skydiving',             image: require('../assets/images/HomeSkydiving.jpg'),   location: 'Pokhara' },
-  { id: 'rafting',  title: 'White Water Rafting',   image: require('../assets/images/Homerafting.jpg'),     location: 'Trishuli' },
+  { id: 'bungee',     title: 'Bungee Jumping',     image: require('../assets/images/HomeBungee.jpg'),       location: 'Kushma' },
+  { id: 'zipline',    title: 'Zip Lining',         image: require('../assets/images/HomeZipline.jpg'),      location: 'Pokhara' },
+  { id: 'skydiving',  title: 'Skydiving',          image: require('../assets/images/HomeSkydiving.jpg'),    location: 'Pokhara' },
+  { id: 'rafting',    title: 'White Water Rafting',image: require('../assets/images/Homerafting.jpg'),      location: 'Trishuli' },
 ];
 
 const CULTURE: Place[] = [
@@ -76,41 +85,87 @@ const ITINERARIES: Itinerary[] = [
   },
 ];
 
-// Slides for the top carousel
 const CAROUSEL_SLIDES: Place[] = [
-  { id: 'pokhara',    title: 'Sunrise over Phewa',  image: require('../assets/images/HomePokhara.jpg'),    location: 'Pokhara' },
-  { id: 'kalinchowk', title: 'Snowy Kalinchowk',    image: require('../assets/images/HomeKalinchowk.jpg'), location: 'Dolakha' },
-  { id: 'bhaktapur',  title: 'Bhaktapur Heritage',  image: require('../assets/images/HomeBhaktapur.jpg'),  location: 'Bhaktapur' },
+  { id: 'pokhara',    title: 'Sunrise over Phewa',  image: require('../assets/images/HomePokhara.jpg'),     location: 'Pokhara' },
+  { id: 'kalinchowk', title: 'Snowy Kalinchowk',    image: require('../assets/images/HomeKalinchowk.jpg'),  location: 'Dolakha' },
+  { id: 'bhaktapur',  title: 'Bhaktapur Heritage',  image: require('../assets/images/HomeBhaktapur.jpg'),   location: 'Bhaktapur' },
 ];
 
 /* --------------------------------- Screen -------------------------------- */
+
 export default function HomeScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const { width } = useWindowDimensions();
+  const { user } = useAppwriteUser();
 
-  // UI State
   const [search, setSearch] = useState('');
   const [favs, setFavs] = useState<string[]>([]);
+  const [busy, setBusy] = useState<string | null>(null);
 
-  // Card sizing (responsive)
+  // Seed favourites from Appwrite
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!user) { setFavs([]); return; }
+        const docs = await listFavoritesByUser(user.$id);
+        setFavs(docs.map(d => d.placeId));
+      } catch (e: any) {
+        console.warn('Seed favs failed:', e?.message ?? e);
+      }
+    })();
+  }, [user]);
+
   const cardW = Math.min(280, width * 0.7);
   const cardH = cardW * 0.72;
 
-  // Search filter
   const filterPlaces = useCallback(
-    (list: Place[]) => list.filter((p) => p.title.toLowerCase().includes(search.trim().toLowerCase())),
+    (list: Place[]) =>
+      list.filter((p) => p.title.toLowerCase().includes(search.trim().toLowerCase())),
     [search]
   );
 
-  // Favourite toggle
-  const toggleFav = (id: string) =>
-    setFavs((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  // Persisted favourite toggle + prompts
+  const toggleFav = async (place: Place) => {
+    if (!user) {
+      Alert.alert('Sign in required', 'Please sign in to save favourites.');
+      return;
+    }
+    if (busy) return;
+    setBusy(place.id);
+
+    try {
+      const existing = await getFavoriteByUserPlace(user.$id, place.id);
+
+      if (existing) {
+        // optimistic off
+        setFavs(prev => prev.filter(x => x !== place.id));
+        await removeFavoriteById(existing.$id);
+        Alert.alert('Removed', `"${place.title}" removed from favourites.`);
+      } else {
+        // optimistic on
+        setFavs(prev => (prev.includes(place.id) ? prev : [...prev, place.id]));
+        await toggleFavoriteApi({
+          userId: user.$id,
+          placeId: place.id,
+          title: place.title,
+          // description/image are optional in your schema; add if you have them
+        });
+        Alert.alert('Saved', `"${place.title}" added to favourites.`);
+      }
+    } catch (e: any) {
+      // best-effort rollback of optimistic add
+      setFavs(prev => prev.filter(x => x !== place.id));
+      Alert.alert('Error', e?.message ?? 'Could not update favourite.');
+    } finally {
+      setBusy(null);
+    }
+  };
 
   const tint = Colors[colorScheme ?? 'light'].tint;
 
-  // Navigation helpers — only to existing routes in your tree
-  const openDetails = (id: string) => router.push({ pathname: '/location-details', params: { id } });
+  const openDetails = (id: string) =>
+    router.push({ pathname: '/location-details', params: { id } });
   const goDiscover = () => router.push('/(tabs)/Discover');
   const goFavourites = () => router.push('/(tabs)/Favourites');
 
@@ -123,7 +178,10 @@ export default function HomeScreen() {
             slides={CAROUSEL_SLIDES}
             width={width}
             isFav={(id) => favs.includes(id)}
-            onToggleFav={toggleFav}
+            onToggleFav={(id) => {
+              const place = CAROUSEL_SLIDES.find(p => p.id === id);
+              if (place) toggleFav(place);
+            }}
             onOpen={openDetails}
             tint={tint}
           />
@@ -144,7 +202,7 @@ export default function HomeScreen() {
           </View>
 
           <View style={styles.quickRow}>
-            <QuickAction icon="map" label="Itinerary" onPress={() => router.push('/itineraries' as any)} />
+            <QuickAction icon="map" label="Itinerary"   onPress={() => router.push('/itineraries' as any)} />
             <QuickAction icon="sparkles" label="Festivals" onPress={() => router.push('/festivals' as any)} />
             <QuickAction icon="mappin.and.ellipse" label="Top Places" onPress={goDiscover} />
             <QuickAction icon="heart" label="Favourites" onPress={goFavourites} />
@@ -165,7 +223,7 @@ export default function HomeScreen() {
               width={cardW}
               height={cardH}
               isFav={favs.includes(item.id)}
-              onFav={() => toggleFav(item.id)}
+              onFav={() => toggleFav(item)}
               onOpen={() => openDetails(item.id)}
               tint={tint}
             />
@@ -186,7 +244,7 @@ export default function HomeScreen() {
               width={cardW}
               height={cardH}
               isFav={favs.includes(item.id)}
-              onFav={() => toggleFav(item.id)}
+              onFav={() => toggleFav(item)}
               onOpen={() => openDetails(item.id)}
               tint={tint}
             />
@@ -207,7 +265,7 @@ export default function HomeScreen() {
               width={cardW}
               height={cardH}
               isFav={favs.includes(item.id)}
-              onFav={() => toggleFav(item.id)}
+              onFav={() => toggleFav(item)}
               onOpen={() => openDetails(item.id)}
               tint={tint}
             />
@@ -220,7 +278,6 @@ export default function HomeScreen() {
           actionLabel="See calendar"
           onAction={() => router.push('/festivals' as any)}
         />
-
         <FlatList
           data={FESTIVALS}
           keyExtractor={(f) => f.id}
@@ -240,7 +297,6 @@ export default function HomeScreen() {
           actionLabel="Browse itineraries"
           onAction={() => router.push('/itineraries')}
         />
-
         <View style={styles.itineraryList}>
           {ITINERARIES.map((it) => (
             <Pressable
@@ -299,7 +355,7 @@ function TopCarousel({
 }) {
   const carouselRef = useRef<ICarouselInstance | null>(null);
   const sliderW = width;
-  const sliderH = Math.max(180, Math.min(260, width * 0.55)); // responsive height
+  const sliderH = Math.max(180, Math.min(260, width * 0.55));
 
   return (
     <Carousel
@@ -312,18 +368,16 @@ function TopCarousel({
       autoPlayInterval={3000}
       pagingEnabled
       scrollAnimationDuration={700}
-      renderItem={({ item, index, animationValue }) => {
+      renderItem={({ item, animationValue }) => {
         const style = useAnimatedStyle(() => ({
-          transform: [
-            {
-              scale: interpolate(
-                animationValue.value,
-                [-1, 0, 1],
-                [0.92, 1, 0.92],
-                Extrapolation.CLAMP
-              ),
-            },
-          ],
+          transform: [{
+            scale: interpolate(
+              animationValue.value,
+              [-1, 0, 1],
+              [0.92, 1, 0.92],
+              Extrapolation.CLAMP
+            ),
+          }],
         }));
 
         return (
@@ -453,7 +507,6 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#f8fafc' },
   scrollBody: { paddingBottom: 48 },
 
-  /* SEARCH + QUICK */
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -472,21 +525,32 @@ const styles = StyleSheet.create({
 
   quickRow: { flexDirection: 'row', gap: 12, marginTop: 12 },
   quick: {
-    flex: 1, alignItems: 'center', backgroundColor: '#ffffff', borderRadius: 12, paddingVertical: 12, gap: 6,
-    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2,
+    flex: 1,
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    paddingVertical: 12,
+    gap: 6,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
   quickIconWrap: { backgroundColor: '#f3f4f6', padding: 8, borderRadius: 999 },
   quickLabel: { fontSize: 12, fontWeight: '600', color: '#111827' },
 
-  /* SECTION HEADER */
   sectionHeaderRow: {
-    paddingHorizontal: 16, marginTop: 24, marginBottom: 12, flexDirection: 'row',
-    justifyContent: 'space-between', alignItems: 'flex-end',
+    paddingHorizontal: 16,
+    marginTop: 24,
+    marginBottom: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
   },
   sectionTitle: { fontSize: 20, fontWeight: '800', color: '#111827' },
   sectionAction: { color: '#2563eb', fontWeight: '700' },
 
-  /* CAROUSEL */
   slideCard: {
     flex: 1,
     marginHorizontal: 12,
@@ -513,7 +577,6 @@ const styles = StyleSheet.create({
     padding: 6,
   },
 
-  /* PLACE CARD */
   placeCard: {
     backgroundColor: '#fff',
     borderRadius: 14,
@@ -547,7 +610,6 @@ const styles = StyleSheet.create({
   placeLocRow: { marginTop: 4, flexDirection: 'row', alignItems: 'center', gap: 6 },
   placeLocText: { color: '#e5e7eb', fontSize: 12 },
 
-  /* FESTIVAL PILL */
   festivalPill: {
     backgroundColor: '#ffffff',
     borderRadius: 12,
@@ -566,7 +628,6 @@ const styles = StyleSheet.create({
   festivalName: { marginTop: 6, fontWeight: '700', color: '#111827' },
   festivalCity: { marginTop: 2, color: '#6b7280', fontSize: 12 },
 
-  /* ITINERARIES */
   itineraryList: { paddingHorizontal: 16, gap: 12 },
   itineraryCard: {
     backgroundColor: '#fff',
@@ -589,7 +650,6 @@ const styles = StyleSheet.create({
   chip: { backgroundColor: '#f3f4f6', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999 },
   chipText: { fontSize: 11, color: '#374151' },
 
-  /* CTA */
   cta: { paddingHorizontal: 16, marginTop: 28, alignItems: 'center', gap: 12 },
   ctaText: { fontSize: 18, fontWeight: '800', color: '#111827' },
   primaryBtn: { paddingHorizontal: 18, paddingVertical: 12, borderRadius: 10 },

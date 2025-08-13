@@ -1,12 +1,18 @@
-// app/(tabs)/favourite.tsx
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import { View, Text, FlatList, RefreshControl, StyleSheet, ActivityIndicator } from "react-native";
-import FavoriteCard from "components/FavoriteCard";
-import { useAppwriteUser } from "hooks/useAppwriteUser";
-import { FavoriteDoc, listFavoritesByUser, removeFavoriteById } from "lib/favorites";
-import { IDs, subscribe } from "lib/appwrite";
+// app/(tabs)/Favourites.tsx
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator, Alert, FlatList, RefreshControl,
+  StyleSheet, Text, View, Pressable, SafeAreaView
+} from 'react-native';
+import { useRouter } from 'expo-router';
 
-export default function FavouriteScreen() {
+import FavoriteCard from '@/components/FavoriteCard';
+import { useAppwriteUser } from '@/hooks/useAppwriteUser';
+import { FavoriteDoc, listFavoritesByUser, removeFavoriteById } from '@/lib/favorites';
+import { IDs, subscribe } from '@/lib/appwrite';
+
+export default function FavouritesScreen() {
+  const router = useRouter();
   const { user, loading } = useAppwriteUser();
   const [items, setItems] = useState<FavoriteDoc[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -19,7 +25,6 @@ export default function FavouriteScreen() {
     setItems(docs);
   }, [user]);
 
-  // Initial fetch
   useEffect(() => {
     if (loading) return;
     if (!user) {
@@ -33,27 +38,26 @@ export default function FavouriteScreen() {
     })();
   }, [loading, user, load]);
 
-  // Realtime subscription
   useEffect(() => {
     if (!user) return;
 
-    const unsubscribe = subscribe(
+    const unsub = subscribe(
       `databases.${IDs.databaseId}.collections.${IDs.favoritesColId}.documents`,
       (event: any) => {
         const doc = event.payload as FavoriteDoc;
         if (!doc || doc.userId !== user.$id) return;
 
-        if (event.events.some((e: string) => e.endsWith(".create"))) {
+        if (event.events.some((e: string) => e.endsWith('.create'))) {
           setItems(prev => (prev.find(d => d.$id === doc.$id) ? prev : [doc, ...prev]));
-        } else if (event.events.some((e: string) => e.endsWith(".update"))) {
+        } else if (event.events.some((e: string) => e.endsWith('.update'))) {
           setItems(prev => prev.map(d => (d.$id === doc.$id ? doc : d)));
-        } else if (event.events.some((e: string) => e.endsWith(".delete"))) {
+        } else if (event.events.some((e: string) => e.endsWith('.delete'))) {
           setItems(prev => prev.filter(d => d.$id !== doc.$id));
         }
       }
     );
 
-    unsubRef.current = unsubscribe;
+    unsubRef.current = () => unsub();
     return () => { try { unsubRef.current?.(); } catch {} };
   }, [user]);
 
@@ -63,16 +67,42 @@ export default function FavouriteScreen() {
     try { await load(); } finally { setRefreshing(false); }
   }, [user, load]);
 
-  const handleDelete = useCallback(async (docId: string) => {
-    const prev = items;
-    setItems(cur => cur.filter(i => i.$id !== docId)); // optimistic UI
-    try {
-      await removeFavoriteById(docId);
-      // realtime ".delete" will also arrive
-    } catch {
-      setItems(prev); // rollback if API fails
-    }
+  const confirmDelete = useCallback((docId: string, title?: string) => {
+    Alert.alert(
+      'Remove favourite',
+      `Delete "${title || 'this place'}" from your favourites?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            const prev = items;
+            setItems(cur => cur.filter(i => i.$id !== docId)); // optimistic
+            try {
+              await removeFavoriteById(docId);
+              Alert.alert('Removed', 'Favourite deleted.');
+            } catch (e: any) {
+              setItems(prev); // rollback
+              Alert.alert('Error', e?.message ?? 'Could not delete favourite.');
+            }
+          },
+        },
+      ]
+    );
   }, [items]);
+
+  const openDetails = (item: FavoriteDoc) => {
+    router.push({
+      pathname: '/favourite/[id]',
+      params: {
+        id: item.$id,
+        title: item.title || '',
+        image: item.image || '',
+        description: item.description || '',
+      },
+    });
+  };
 
   if (loading || initialLoading) {
     return (
@@ -92,11 +122,11 @@ export default function FavouriteScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.root}>
       <Text style={styles.h1}>Your Favourites</Text>
 
       {items.length === 0 ? (
-        <View style={styles.center}>
+        <View style={[styles.center, { flex: 1 }]}>
           <Text>No favourites yet.</Text>
           <Text style={{ color: "#777" }}>Add some places to see them here.</Text>
         </View>
@@ -104,19 +134,25 @@ export default function FavouriteScreen() {
         <FlatList
           data={items}
           keyExtractor={(item) => item.$id}
-          renderItem={({ item }) => (
-            <FavoriteCard item={item} onDelete={handleDelete} />
-          )}
+          contentContainerStyle={{ paddingBottom: 24, paddingHorizontal: 12 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-          contentContainerStyle={{ paddingBottom: 32 }}
+          renderItem={({ item }) => (
+            <Pressable onPress={() => openDetails(item)}>
+              <FavoriteCard
+                title={item.title}     // << lower-case
+                image={item.image}     // << prop name is image
+                onDelete={() => confirmDelete(item.$id, item.title)}
+              />
+            </Pressable>
+          )}
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fafafa", paddingTop: 8 },
-  h1: { fontSize: 22, fontWeight: "800", marginHorizontal: 16, marginBottom: 4 },
-  center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 16 },
+  root: { flex: 1, backgroundColor: '#fafafa' },
+  h1: { fontSize: 22, fontWeight: '800', marginHorizontal: 16, marginVertical: 8 },
+  center: { alignItems: 'center', justifyContent: 'center', padding: 16 },
 });
