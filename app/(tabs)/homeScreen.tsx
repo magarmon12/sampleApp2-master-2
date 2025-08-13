@@ -1,9 +1,6 @@
 // app/(tabs)/homeScreen.tsx
-import { IconSymbol } from '@/components/ui/IconSymbol';
-import { Colors } from '@/constants/Colors';
-import { useColorScheme } from '@/hooks/useColorScheme';
-import { useRouter } from 'expo-router';
-import React, { useCallback, useRef, useState } from 'react';
+import { Href, useRouter } from 'expo-router';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
   Image,
@@ -15,40 +12,51 @@ import {
   TextInput,
   View,
   useWindowDimensions,
+  Alert,
 } from 'react-native';
 import Animated, { Extrapolation, interpolate, useAnimatedStyle } from 'react-native-reanimated';
 import Carousel, { ICarouselInstance } from 'react-native-reanimated-carousel';
+import { Permission, Role } from 'react-native-appwrite';
 
-/* ----------------------------- Mocked Content ----------------------------- */
-type Place = { id: string; title: string; image: any; location?: string };
+import { IconSymbol } from '@/components/ui/IconSymbol';
+import { Colors } from '@/constants/Colors';
+import { useColorScheme } from '@/hooks/useColorScheme';
+
+// 🔗 Shared favourites store (live across Home <-> Favourites)
+import { useFavorites } from '@/hooks/favouritesContext';
+
+/* ----------------------------- Types & Data ----------------------------- */
+
+type Place = { id: string; title: string; image: any; location?: string; description?: string };
 type Festival = { id: string; name: string; date: string; city: string };
 type Itinerary = { id: string; title: string; days: number; highlights: string[]; cover: any };
 
+// NOTE: Images are under project-root /assets/images, so from app/(tabs) use ../../assets/images/...
 const TOP_PLACES: Place[] = [
-  { id: 'kalinchowk', title: 'Kalinchowk', image: require('../../assets/images/HomeKalinchowk.jpg'), location: 'Dolakha' },
-  { id: 'pokhara', title: 'Pokhara Lakeside', image: require('../../assets/images/HomePokhara.jpg'), location: 'Pokhara' },
-  { id: 'nagarkot', title: 'Nagarkot Sunrise', image: require('../../assets/images/HomeNagarkot.jpg'), location: 'Nagarkot' },
+  { id: 'kalinchowk', title: 'Kalinchowk',         image: require('../../assets/images/HomeKalinchowk.jpg'),  location: 'Dolakha' },
+  { id: 'pokhara',    title: 'Pokhara Lakeside',   image: require('../../assets/images/HomePokhara.jpg'),      location: 'Pokhara' },
+  { id: 'nagarkot',   title: 'Nagarkot Sunrise',   image: require('../../assets/images/HomeNagarkot.jpg'),     location: 'Nagarkot' },
 ];
 
 const ADVENTURE: Place[] = [
-  { id: 'bungee', title: 'Bungee Jumping', image: require('../../assets/images/HomeBungee.jpg'), location: 'Kushma' },
-  { id: 'zipline', title: 'Zip Lining', image: require('../../assets/images/HomeZipline.jpg'), location: 'Pokhara' },
-  { id: 'skydiving', title: 'Skydiving', image: require('../../assets/images/HomeSkydiving.jpg'), location: 'Pokhara' },
-  { id: 'rafting', title: 'White Water Rafting', image: require('../../assets/images/Homerafting.jpg'), location: 'Trishuli' },
+  { id: 'bungee',     title: 'Bungee Jumping',      image: require('../../assets/images/HomeBungee.jpg'),       location: 'Kushma' },
+  { id: 'zipline',    title: 'Zip Lining',          image: require('../../assets/images/HomeZipline.jpg'),      location: 'Pokhara' },
+  { id: 'skydiving',  title: 'Skydiving',           image: require('../../assets/images/HomeSkydiving.jpg'),    location: 'Pokhara' },
+  { id: 'rafting',    title: 'White Water Rafting', image: require('../../assets/images/Homerafting.jpg'),      location: 'Trishuli' },
 ];
 
 const CULTURE: Place[] = [
   { id: 'pashupatinath', title: 'Pashupatinath Temple', image: require('../../assets/images/HomePashupatinath.jpg'), location: 'Kathmandu' },
-  { id: 'bouddha', title: 'Bouddhanath Stupa', image: require('../../assets/images/HomeBouddha.jpg'), location: 'Kathmandu' },
-  { id: 'bhaktapur', title: 'Art Bhaktapur', image: require('../../assets/images/HomeBhaktapur.jpg'), location: 'Bhaktapur' },
-  { id: 'lumbini', title: 'Lumbini', image: require('../../assets/images/HomeLumbini.jpg'), location: 'Rupandehi' },
+  { id: 'bouddha',       title: 'Bouddhanath Stupa',    image: require('../../assets/images/HomeBouddha.jpg'),        location: 'Kathmandu' },
+  { id: 'bhaktapur',     title: 'Art Bhaktapur',        image: require('../../assets/images/HomeBhaktapur.jpg'),      location: 'Bhaktapur' },
+  { id: 'lumbini',       title: 'Lumbini',              image: require('../../assets/images/HomeLumbini.jpg'),        location: 'Rupandehi' },
 ];
 
 const FESTIVALS: Festival[] = [
   { id: 'dashain', name: 'Dashain', date: 'Oct 10', city: 'Kathmandu' },
-  { id: 'tihar', name: 'Tihar', date: 'Nov 3', city: 'Bhaktapur' },
-  { id: 'holi', name: 'Holi', date: 'Mar 22', city: 'Pokhara' },
-  { id: 'losar', name: 'Losar', date: 'Feb 9', city: 'Boudha' },
+  { id: 'tihar',   name: 'Tihar',   date: 'Nov 3',  city: 'Bhaktapur' },
+  { id: 'holi',    name: 'Holi',    date: 'Mar 22', city: 'Pokhara' },
+  { id: 'losar',   name: 'Losar',   date: 'Feb 9',  city: 'Boudha' },
 ];
 
 const ITINERARIES: Itinerary[] = [
@@ -75,45 +83,50 @@ const ITINERARIES: Itinerary[] = [
   },
 ];
 
-// Slides for the top carousel (you can mix any highlights you want)
 const CAROUSEL_SLIDES: Place[] = [
-  { id: 'pokhara', title: 'Sunrise over Phewa', image: require('../../assets/images/HomePokhara.jpg'), location: 'Pokhara' },
-  { id: 'kalinchowk', title: 'Snowy Kalinchowk', image: require('../../assets/images/HomeKalinchowk.jpg'), location: 'Dolakha' },
-  { id: 'bhaktapur', title: 'Bhaktapur Heritage', image: require('../../assets/images/HomeBhaktapur.jpg'), location: 'Bhaktapur' },
+  { id: 'pokhara',    title: 'Sunrise over Phewa',  image: require('../../assets/images/HomePokhara.jpg'),     location: 'Pokhara' },
+  { id: 'kalinchowk', title: 'Snowy Kalinchowk',    image: require('../../assets/images/HomeKalinchowk.jpg'),  location: 'Dolakha' },
+  { id: 'bhaktapur',  title: 'Bhaktapur Heritage',  image: require('../../assets/images/HomeBhaktapur.jpg'),   location: 'Bhaktapur' },
 ];
 
 /* --------------------------------- Screen -------------------------------- */
+
 export default function HomeScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const { width } = useWindowDimensions();
 
-  // UI State
+  // Live favourites from the shared store
+  const { isFavourited, toggleFavourite } = useFavorites();
+
   const [search, setSearch] = useState('');
-  const [favs, setFavs] = useState<string[]>([]);
 
-  // Card sizing (responsive)
-  const cardW = Math.min(280, width * 0.7);
-  const cardH = cardW * 0.72;
+  const cardW = useMemo(() => Math.min(280, Math.round(width * 0.7)), [width]);
+  const cardH = useMemo(() => Math.round(cardW * 0.72), [cardW]);
 
-  // Search filter
   const filterPlaces = useCallback(
-    (list: Place[]) =>
-      list.filter((p) => p.title.toLowerCase().includes(search.trim().toLowerCase())),
+    (list: Place[]) => {
+      const q = search.trim().toLowerCase();
+      if (!q) return list;
+      return list.filter((p) => p.title.toLowerCase().includes(q));
+    },
     [search]
   );
 
-  // Favourite toggle
-  const toggleFav = (id: string) =>
-    setFavs((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-
   const tint = Colors[colorScheme ?? 'light'].tint;
 
-  // Navigation helpers — only to existing routes in your tree
   const openDetails = (id: string) =>
     router.push({ pathname: '/location-details', params: { id } });
-  const goDiscover = () => router.push('/(tabs)/Discover');
+
+  // You removed Discover — route CTAs to Favourites or Hidden Gems instead
   const goFavourites = () => router.push('/(tabs)/Favourites');
+  const goHiddenGems = () => router.push('/(tabs)/HiddenGem'); // matches tabs order we set
+
+  const goFestivals = () =>
+    router.push({ pathname: '/festivals' } as unknown as Href);
+
+  const openFestival = (id: string) =>
+    router.push({ pathname: '/festivals/[id]', params: { id } } as unknown as Href);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -123,8 +136,14 @@ export default function HomeScreen() {
           <TopCarousel
             slides={CAROUSEL_SLIDES}
             width={width}
-            isFav={(id) => favs.includes(id)}
-            onToggleFav={toggleFav}
+            isFav={(id) => isFavourited(id)}
+            onToggleFav={(id) =>
+              toggleFavourite({
+                placeId: id,
+                title: CAROUSEL_SLIDES.find(p => p.id === id)?.title,
+                // no URL here (bundled image), optional description
+              }).catch(e => Alert.alert('Error', e?.message ?? 'Could not update favourite.'))
+            }
             onOpen={openDetails}
             tint={tint}
           />
@@ -145,28 +164,34 @@ export default function HomeScreen() {
           </View>
 
           <View style={styles.quickRow}>
-            <QuickAction icon="map" label="Itinerary" onPress={() => router.push('/itineraries' as any)} />
-            <QuickAction icon="sparkles" label="Festivals" onPress={() => router.push('/festivals' as any)} />
-            <QuickAction icon="mappin.and.ellipse" label="Top Places" onPress={goDiscover} />
+            <QuickAction icon="map" label="Itinerary"   onPress={() => router.push('/itineraries')} />
+            <QuickAction icon="sparkles" label="Festivals" onPress={goFestivals} />
+            <QuickAction icon="star" label="Hidden Gems" onPress={goHiddenGems} />
             <QuickAction icon="heart" label="Favourites" onPress={goFavourites} />
           </View>
         </View>
 
         {/* ============================ TOP PLACES =========================== */}
-        <SectionHeader title="Top Places" actionLabel="View all" onAction={goDiscover} />
+        <SectionHeader title="Top Places" actionLabel="View all" onAction={goFavourites} />
         <FlatList
           data={filterPlaces(TOP_PLACES)}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item: Place) => item.id}
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 16 }}
-          renderItem={({ item }) => (
+          renderItem={({ item }: { item: Place }) => (
             <PlaceCard
               item={item}
               width={cardW}
               height={cardH}
-              isFav={favs.includes(item.id)}
-              onFav={() => toggleFav(item.id)}
+              isFav={isFavourited(item.id)}
+              onFav={() =>
+                toggleFavourite({
+                  placeId: item.id,
+                  title: item.title,
+                  // image/description optional here (bundled image)
+                }).catch(e => Alert.alert('Error', e?.message ?? 'Could not update favourite.'))
+              }
               onOpen={() => openDetails(item.id)}
               tint={tint}
             />
@@ -174,20 +199,25 @@ export default function HomeScreen() {
         />
 
         {/* ============================ ADVENTURE ============================ */}
-        <SectionHeader title="Adventure" actionLabel="Browse" onAction={goDiscover} />
+        <SectionHeader title="Adventure" actionLabel="Browse" onAction={goHiddenGems} />
         <FlatList
           data={filterPlaces(ADVENTURE)}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item: Place) => item.id}
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 16 }}
-          renderItem={({ item }) => (
+          renderItem={({ item }: { item: Place }) => (
             <PlaceCard
               item={item}
               width={cardW}
               height={cardH}
-              isFav={favs.includes(item.id)}
-              onFav={() => toggleFav(item.id)}
+              isFav={isFavourited(item.id)}
+              onFav={() =>
+                toggleFavourite({
+                  placeId: item.id,
+                  title: item.title,
+                }).catch(e => Alert.alert('Error', e?.message ?? 'Could not update favourite.'))
+              }
               onOpen={() => openDetails(item.id)}
               tint={tint}
             />
@@ -195,20 +225,25 @@ export default function HomeScreen() {
         />
 
         {/* ============================== CULTURE ============================ */}
-        <SectionHeader title="Culture" actionLabel="Browse" onAction={goDiscover} />
+        <SectionHeader title="Culture" actionLabel="Browse" onAction={goHiddenGems} />
         <FlatList
           data={filterPlaces(CULTURE)}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item: Place) => item.id}
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 16 }}
-          renderItem={({ item }) => (
+          renderItem={({ item }: { item: Place }) => (
             <PlaceCard
               item={item}
               width={cardW}
               height={cardH}
-              isFav={favs.includes(item.id)}
-              onFav={() => toggleFav(item.id)}
+              isFav={isFavourited(item.id)}
+              onFav={() =>
+                toggleFavourite({
+                  placeId: item.id,
+                  title: item.title,
+                }).catch(e => Alert.alert('Error', e?.message ?? 'Could not update favourite.'))
+              }
               onOpen={() => openDetails(item.id)}
               tint={tint}
             />
@@ -216,51 +251,60 @@ export default function HomeScreen() {
         />
 
         {/* ========================= FESTIVAL CALENDAR ======================= */}
-        <SectionHeader title="Festival Calendar" actionLabel="See calendar" onAction={() => router.push('/festivals' as any)} />
+        <SectionHeader
+          title="Festival Calendar"
+          actionLabel="See calendar"
+          onAction={goFestivals}
+        />
         <FlatList
           data={FESTIVALS}
-          keyExtractor={(f) => f.id}
+          keyExtractor={(f: Festival) => f.id}
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 16 }}
-          renderItem={({ item }) => <FestivalPill festival={item} />}
+          renderItem={({ item }: { item: Festival }) => (
+            <Pressable onPress={() => openFestival(item.id)} style={{ marginRight: 12 }}>
+              <FestivalPill festival={item} />
+            </Pressable>
+          )}
         />
-{/* ========================= MINI ITINERARIES ======================== */}
-<SectionHeader
-  title="Mini Itineraries"
-  actionLabel="Browse itineraries"
-  onAction={() => router.push('/itineraries')}
-/>
 
-<View style={styles.itineraryList}>
-  {ITINERARIES.map((it) => (
-    <Pressable
-      key={it.id}
-      onPress={() => router.push({ pathname: '/itineraries/[id]', params: { id: it.id } })}
-      style={styles.itineraryCard}
-    >
-      <Image source={it.cover} style={styles.itineraryCover} />
-      <View style={styles.itineraryInfo}>
-        <Text style={styles.itineraryTitle}>{it.title}</Text>
-        <Text style={styles.itineraryMeta}>{it.days} days • {it.highlights[0]}</Text>
-        <View style={styles.itineraryChips}>
-          {it.highlights.slice(0, 3).map((h, i) => (
-            <View key={i} style={styles.chip}>
-              <Text style={styles.chipText}>{h}</Text>
-            </View>
+        {/* ========================= MINI ITINERARIES ======================== */}
+        <SectionHeader
+          title="Mini Itineraries"
+          actionLabel="Browse itineraries"
+          onAction={() => router.push('/itineraries')}
+        />
+        <View style={styles.itineraryList}>
+          {ITINERARIES.map((it: Itinerary) => (
+            <Pressable
+              key={it.id}
+              onPress={() => router.push(`/itineraries/${it.id}`)}
+              style={styles.itineraryCard}
+            >
+              <Image source={it.cover} style={styles.itineraryCover} />
+              <View style={styles.itineraryInfo}>
+                <Text style={styles.itineraryTitle}>{it.title}</Text>
+                <Text style={styles.itineraryMeta}>{it.days} days • {it.highlights[0]}</Text>
+                <View style={styles.itineraryChips}>
+                  {it.highlights.slice(0, 3).map((h: string, i: number) => (
+                    <View key={i} style={styles.chip}>
+                      <Text style={styles.chipText}>{h}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+              <IconSymbol name="chevron.right" size={18} color="#9ca3af" />
+            </Pressable>
           ))}
         </View>
-      </View>
-      <IconSymbol name="chevron.right" size={18} color="#9ca3af" />
-    </Pressable>
-  ))}
-</View>
+
         {/* ============================== CTA =============================== */}
         <View style={styles.cta}>
           <Text style={styles.ctaText}>Ready to plan your trip?</Text>
           <Pressable
             style={[styles.primaryBtn, { backgroundColor: tint }]}
-            onPress={() => router.push('/itineraries' as any)}
+            onPress={() => router.push('/itineraries')}
           >
             <Text style={styles.primaryBtnText}>Build My Itinerary</Text>
           </Pressable>
@@ -289,7 +333,7 @@ function TopCarousel({
 }) {
   const carouselRef = useRef<ICarouselInstance | null>(null);
   const sliderW = width;
-  const sliderH = Math.max(180, Math.min(260, width * 0.55)); // responsive height
+  const sliderH = Math.max(180, Math.min(260, width * 0.55));
 
   return (
     <Carousel
@@ -302,22 +346,17 @@ function TopCarousel({
       autoPlayInterval={3000}
       pagingEnabled
       scrollAnimationDuration={700}
-      renderItem={({ item, index, animationValue }) => {
-        // subtle scale on center item
-        const style = useAnimatedStyle(() => {
-          return {
-            transform: [
-              {
-                scale: interpolate(
-                  animationValue.value,
-                  [-1, 0, 1],
-                  [0.92, 1, 0.92],
-                  Extrapolation.CLAMP
-                ),
-              },
-            ],
-          };
-        });
+      renderItem={({ item, animationValue }: { item: Place; animationValue: any }) => {
+        const style = useAnimatedStyle(() => ({
+          transform: [{
+            scale: interpolate(
+              animationValue.value,
+              [-1, 0, 1],
+              [0.92, 1, 0.92],
+              Extrapolation.CLAMP
+            ),
+          }],
+        }));
 
         return (
           <Animated.View style={[styles.slideCard, style]}>
@@ -335,11 +374,7 @@ function TopCarousel({
               </View>
             </Pressable>
 
-            <Pressable
-              onPress={() => onToggleFav(item.id)}
-              style={styles.slideHeart}
-              hitSlop={8}
-            >
+            <Pressable onPress={() => onToggleFav(item.id)} style={styles.slideHeart} hitSlop={8}>
               <IconSymbol
                 name={isFav(item.id) ? 'heart.fill' : 'heart'}
                 size={22}
@@ -450,7 +485,6 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#f8fafc' },
   scrollBody: { paddingBottom: 48 },
 
-  /* SEARCH + QUICK */
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -469,21 +503,32 @@ const styles = StyleSheet.create({
 
   quickRow: { flexDirection: 'row', gap: 12, marginTop: 12 },
   quick: {
-    flex: 1, alignItems: 'center', backgroundColor: '#ffffff', borderRadius: 12, paddingVertical: 12, gap: 6,
-    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2,
+    flex: 1,
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    paddingVertical: 12,
+    gap: 6,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
   quickIconWrap: { backgroundColor: '#f3f4f6', padding: 8, borderRadius: 999 },
   quickLabel: { fontSize: 12, fontWeight: '600', color: '#111827' },
 
-  /* SECTION HEADER */
   sectionHeaderRow: {
-    paddingHorizontal: 16, marginTop: 24, marginBottom: 12, flexDirection: 'row',
-    justifyContent: 'space-between', alignItems: 'flex-end',
+    paddingHorizontal: 16,
+    marginTop: 24,
+    marginBottom: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
   },
   sectionTitle: { fontSize: 20, fontWeight: '800', color: '#111827' },
   sectionAction: { color: '#2563eb', fontWeight: '700' },
 
-  /* CAROUSEL */
   slideCard: {
     flex: 1,
     marginHorizontal: 12,
@@ -510,7 +555,6 @@ const styles = StyleSheet.create({
     padding: 6,
   },
 
-  /* PLACE CARD */
   placeCard: {
     backgroundColor: '#fff',
     borderRadius: 14,
@@ -544,7 +588,6 @@ const styles = StyleSheet.create({
   placeLocRow: { marginTop: 4, flexDirection: 'row', alignItems: 'center', gap: 6 },
   placeLocText: { color: '#e5e7eb', fontSize: 12 },
 
-  /* FESTIVAL PILL */
   festivalPill: {
     backgroundColor: '#ffffff',
     borderRadius: 12,
@@ -563,7 +606,6 @@ const styles = StyleSheet.create({
   festivalName: { marginTop: 6, fontWeight: '700', color: '#111827' },
   festivalCity: { marginTop: 2, color: '#6b7280', fontSize: 12 },
 
-  /* ITINERARIES */
   itineraryList: { paddingHorizontal: 16, gap: 12 },
   itineraryCard: {
     backgroundColor: '#fff',
@@ -586,7 +628,6 @@ const styles = StyleSheet.create({
   chip: { backgroundColor: '#f3f4f6', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999 },
   chipText: { fontSize: 11, color: '#374151' },
 
-  /* CTA */
   cta: { paddingHorizontal: 16, marginTop: 28, alignItems: 'center', gap: 12 },
   ctaText: { fontSize: 18, fontWeight: '800', color: '#111827' },
   primaryBtn: { paddingHorizontal: 18, paddingVertical: 12, borderRadius: 10 },

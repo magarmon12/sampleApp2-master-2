@@ -1,9 +1,50 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Modal, Dimensions } from 'react-native';
+// app/(tabs)/HiddenGem.tsx
+import { IconSymbol } from '@/components/ui/IconSymbol';
+import { Colors } from '@/constants/Colors';
+import useAppwriteUser from '@/hooks/useAppwriteUser';
+import { useColorScheme } from '@/hooks/useColorScheme';
+import { databases, ID, IDs, Query } from '@/lib/appwrite';
+import { FavoriteDoc, listFavoritesByUser, removeFavoriteById } from '@/lib/favourites';
+import React, { useEffect, useState } from 'react';
+import {
+  Alert,
+  Dimensions,
+  FlatList,
+  Image,
+  ListRenderItem,
+  Modal,
+  Platform,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
-const hiddenGems = [
+/* ------------------------------- Types --------------------------------- */
+type Gem = {
+  id: number;
+  name: string;
+  location: string;
+  shortDesc: string;
+  fullDescription: string;
+  image: string;            // remote URL
+  difficulty: string;
+  bestTime: string;
+  duration: string;
+};
+
+type NewFav = Pick<FavoriteDoc, 'userId' | 'placeId' | 'title' | 'image' | 'description'>;
+
+/** Make a unique placeId namespace so it won't collide with home places */
+const placeIdFor = (gem: Gem) => `hidden:${gem.id}`;
+
+/* ------------------------------ Data ----------------------------------- */
+const HIDDEN_GEMS: Gem[] = [
   {
     id: 1,
     name: "Tilicho Lake",
@@ -226,63 +267,156 @@ const hiddenGems = [
   }
 ];
 
-export default function HiddenGem() {
-  const [selectedGem, setSelectedGem] = useState(null);
+/* -------------------------- Appwrite helpers --------------------------- */
+async function getFavoriteByUserPlace(userId: string, placeId: string) {
+  const res = await databases.listDocuments<FavoriteDoc>(
+    IDs.databaseId,
+    IDs.favoritesColId,
+    [Query.equal('userId', userId), Query.equal('placeId', placeId), Query.limit(1)]
+  );
+  return (res.documents?.[0] as FavoriteDoc | undefined) ?? undefined;
+}
 
-  const openModal = (gem) => {
-    setSelectedGem(gem);
+async function createFavorite(doc: NewFav) {
+  return databases.createDocument<FavoriteDoc>(
+    IDs.databaseId,
+    IDs.favoritesColId,
+    ID.unique(),
+    doc as any
+  );
+}
+
+/* --------------------------------- Screen -------------------------------- */
+export default function HiddenGem() {
+  const scheme = useColorScheme();
+  const tint = Colors[scheme ?? 'light'].tint;
+
+  const { user } = useAppwriteUser();
+  const [selectedGem, setSelectedGem] = useState<Gem | null>(null);
+  const [favs, setFavs] = useState<string[]>([]);
+  const [busy, setBusy] = useState<string | null>(null); // placeId in-flight
+
+  // Seed favourites for current user
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!user) {
+          setFavs([]);
+          return;
+        }
+        const docs = await listFavoritesByUser(user.$id);
+        setFavs(docs.map((d) => d.placeId));
+      } catch (e: any) {
+        console.warn('[HiddenGem] seed favs failed:', e?.message ?? e);
+      }
+    })();
+  }, [user]);
+
+  const isFav = (gem: Gem) => favs.includes(placeIdFor(gem));
+
+  const toggleFav = async (gem: Gem) => {
+    if (!user) {
+      Alert.alert('Sign in required', 'Please sign in to save favourites.');
+      return;
+    }
+    const pid = placeIdFor(gem);
+    if (busy) return;
+    setBusy(pid);
+
+    try {
+      const existing = await getFavoriteByUserPlace(user.$id, pid);
+      if (existing) {
+        // optimistic off
+        setFavs((prev) => prev.filter((x) => x !== pid));
+        await removeFavoriteById(existing.$id);
+        Alert.alert('Removed', `"${gem.name}" removed from favourites.`);
+      } else {
+        // optimistic on
+        setFavs((prev) => (prev.includes(pid) ? prev : [...prev, pid]));
+        await createFavorite({
+          userId: user.$id,
+          placeId: pid,
+          title: gem.name,
+          image: gem.image,          // remote URL renders fine
+          description: gem.shortDesc // optional
+        });
+        Alert.alert('Saved', `"${gem.name}" added to favourites.`);
+      }
+    } catch (e: any) {
+      // rollback optimistic add
+      setFavs((prev) => prev.filter((x) => x !== pid));
+      Alert.alert('Error', e?.message ?? 'Could not update favourite.');
+    } finally {
+      setBusy(null);
+    }
   };
 
-  const closeModal = () => {
-    setSelectedGem(null);
+  const renderItem: ListRenderItem<Gem> = ({ item }) => {
+    const fav = isFav(item);
+    return (
+      <View style={styles.card}>
+        <Pressable onPress={() => setSelectedGem(item)} style={{ borderRadius: 14, overflow: 'hidden' }}>
+          <Image source={{ uri: item.image }} style={styles.cardImage} />
+          <Pressable onPress={() => toggleFav(item)} hitSlop={8} style={styles.heart}>
+            <IconSymbol name={fav ? 'heart.fill' : 'heart'} size={20} color={fav ? tint : '#111827'} />
+          </Pressable>
+
+          <View style={styles.cardBody}>
+            <Text style={styles.cardTitle} numberOfLines={1}>{item.name}</Text>
+            <Text style={styles.cardLocation} numberOfLines={1}>📍 {item.location}</Text>
+            <Text style={styles.cardDesc} numberOfLines={2}>{item.shortDesc}</Text>
+            <Text style={styles.readMore}>Tap to read more ▶</Text>
+          </View>
+        </Pressable>
+      </View>
+    );
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.safe}>
+      <StatusBar barStyle={scheme === 'dark' ? 'light-content' : 'dark-content'} />
       <View style={styles.header}>
         <Text style={styles.title}>🏔️ Hidden Gems of Nepal</Text>
-        <Text style={styles.subtitle}>Discover Nepal's 20 best kept secrets</Text>
+        <Text style={styles.subtitle}>Discover Nepal&apos;s 20 best kept secrets</Text>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContainer}>
-        <View style={styles.cardsContainer}>
-          {hiddenGems.map((gem) => (
-            <TouchableOpacity
-              key={gem.id}
-              style={styles.card}
-              onPress={() => openModal(gem)}
-              activeOpacity={0.8}
-            >
-              <Image source={{ uri: gem.image }} style={styles.cardImage} />
-              <View style={styles.cardContent}>
-                <Text style={styles.cardTitle}>{gem.name}</Text>
-                <Text style={styles.cardLocation}>📍 {gem.location}</Text>
-                <Text style={styles.cardDescription}>{gem.shortDesc}</Text>
-                <Text style={styles.readMore}>Tap to read more ▶</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </ScrollView>
+      <FlatList
+        data={HIDDEN_GEMS}
+        keyExtractor={(g) => String(g.id)}
+        renderItem={renderItem}
+        numColumns={2}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.listContent}
+        columnWrapperStyle={styles.row}
+      />
 
+      {/* Details Modal */}
       {selectedGem && (
-        <Modal
-          animationType="slide"
-          transparent={false}
-          visible={true}
-          onRequestClose={closeModal}
-        >
-          <ScrollView style={styles.modalContainer}>
-            <TouchableOpacity style={styles.closeButton} onPress={closeModal}>
+        <Modal animationType="slide" transparent={false} visible onRequestClose={() => setSelectedGem(null)}>
+          <ScrollView style={styles.modalContainer} contentInsetAdjustmentBehavior="automatic">
+            <Pressable style={styles.closeButton} onPress={() => setSelectedGem(null)}>
               <Text style={styles.closeButtonText}>✕ Close</Text>
-            </TouchableOpacity>
-            
-            <Image source={{ uri: selectedGem.image }} style={styles.modalImage} />
-            
+            </Pressable>
+
+            <View style={{ position: 'relative' }}>
+              <Image source={{ uri: selectedGem.image }} style={styles.modalImage} />
+              <Pressable
+                onPress={() => toggleFav(selectedGem)}
+                hitSlop={8}
+                style={[styles.heart, { right: 16, top: 16, position: 'absolute' }]}
+              >
+                <IconSymbol
+                  name={isFav(selectedGem) ? 'heart.fill' : 'heart'}
+                  size={22}
+                  color={isFav(selectedGem) ? tint : '#111827'}
+                />
+              </Pressable>
+            </View>
+
             <View style={styles.modalContent}>
               <Text style={styles.modalTitle}>{selectedGem.name}</Text>
               <Text style={styles.modalLocation}>📍 {selectedGem.location}</Text>
-              
+
               <View style={styles.detailsContainer}>
                 <View style={styles.detailItem}>
                   <Text style={styles.detailLabel}>Difficulty:</Text>
@@ -297,164 +431,96 @@ export default function HiddenGem() {
                   <Text style={styles.detailValue}>{selectedGem.duration}</Text>
                 </View>
               </View>
-              
+
               <Text style={styles.modalDescription}>{selectedGem.fullDescription}</Text>
             </View>
           </ScrollView>
         </Modal>
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 
+/* -------------------------------- Styles ------------------------------- */
+const CARD_GAP = 12;
+const CARD_WIDTH = (width - (CARD_GAP * 3)) / 2;
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f7fa',
-  },
+  safe: { flex: 1, backgroundColor: '#f5f7fa' },
+
   header: {
     backgroundColor: '#fff',
-    paddingVertical: 25,
+    paddingTop: Platform.select({ ios: 8, android: 8 }),
+    paddingBottom: 16,
     paddingHorizontal: 20,
     alignItems: 'center',
+    justifyContent: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
     elevation: 3,
   },
-  title: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: '#2c3e50',
-    marginBottom: 5,
+  title: { fontSize: 24, fontWeight: '800', color: '#2c3e50', marginBottom: 4 },
+  subtitle: { fontSize: 14, color: '#7f8c8d', fontStyle: 'italic' },
+
+  listContent: {
+    paddingHorizontal: CARD_GAP,
+    paddingVertical: 14,
+    paddingBottom: 24,
   },
-  subtitle: {
-    fontSize: 15,
-    color: '#7f8c8d',
-    fontStyle: 'italic',
+  row: {
+    gap: CARD_GAP,
+    marginBottom: CARD_GAP,
+    justifyContent: 'space-between',
   },
-  scrollContainer: {
-    paddingBottom: 20,
-  },
-  cardsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-around',
-    paddingHorizontal: 8,
-    paddingTop: 15,
-  },
+
   card: {
-    width: (width - 36) / 2,
+    width: CARD_WIDTH,
     backgroundColor: '#fff',
-    borderRadius: 15,
-    marginBottom: 16,
-    marginHorizontal: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.18,
-    shadowRadius: 8,
-    elevation: 6,
+    borderRadius: 14,
     overflow: 'hidden',
-    transform: [{ scale: 1 }],
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  cardImage: {
-    width: '100%',
-    height: 120,
-    resizeMode: 'cover',
+  cardImage: { width: '100%', height: 120, resizeMode: 'cover' },
+  heart: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    borderRadius: 999,
+    padding: 6,
+    zIndex: 10,
   },
-  cardContent: {
-    padding: 12,
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#2c3e50',
-    marginBottom: 4,
-  },
-  cardLocation: {
-    fontSize: 11,
-    color: '#e74c3c',
-    fontWeight: '600',
-    marginBottom: 6,
-  },
-  cardDescription: {
-    fontSize: 12,
-    color: '#5d6d7e',
-    lineHeight: 16,
-    marginBottom: 8,
-  },
-  readMore: {
-    fontSize: 11,
-    color: '#3498db',
-    fontWeight: '600',
-    fontStyle: 'italic',
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
+  cardBody: { padding: 10 },
+  cardTitle: { fontSize: 15, fontWeight: '800', color: '#1f2937' },
+  cardLocation: { fontSize: 11, color: '#ef4444', fontWeight: '700', marginTop: 2 },
+  cardDesc: { fontSize: 12, color: '#475569', lineHeight: 16, marginTop: 6 },
+  readMore: { fontSize: 11, color: '#2563eb', fontWeight: '700', marginTop: 8 },
+
+  modalContainer: { flex: 1, backgroundColor: '#fff' },
   closeButton: {
     position: 'absolute',
     top: 40,
-    right: 20,
+    right: 16,
     backgroundColor: 'rgba(0,0,0,0.7)',
-    paddingHorizontal: 15,
+    paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
     zIndex: 1000,
   },
-  closeButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  modalImage: {
-    width: '100%',
-    height: 300,
-    resizeMode: 'cover',
-  },
-  modalContent: {
-    padding: 20,
-  },
-  modalTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#2c3e50',
-    marginBottom: 8,
-  },
-  modalLocation: {
-    fontSize: 16,
-    color: '#e74c3c',
-    fontWeight: '600',
-    marginBottom: 20,
-  },
-  detailsContainer: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 20,
-  },
-  detailItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  detailLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#34495e',
-  },
-  detailValue: {
-    fontSize: 14,
-    color: '#7f8c8d',
-    flex: 1,
-    textAlign: 'right',
-  },
-  modalDescription: {
-    fontSize: 15,
-    color: '#5d6d7e',
-    lineHeight: 24,
-    textAlign: 'justify',
-  },
+  closeButtonText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  modalImage: { width: '100%', height: 300, resizeMode: 'cover' },
+  modalContent: { padding: 20 },
+  modalTitle: { fontSize: 22, fontWeight: '800', color: '#111827', marginBottom: 6 },
+  modalLocation: { fontSize: 14, color: '#ef4444', fontWeight: '700', marginBottom: 16 },
+  detailsContainer: { backgroundColor: '#f8f9fa', borderRadius: 10, padding: 14, marginBottom: 16 },
+  detailItem: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+  detailLabel: { fontSize: 14, fontWeight: '700', color: '#111827' },
+  detailValue: { fontSize: 14, color: '#6b7280', flex: 1, textAlign: 'right' },
+  modalDescription: { fontSize: 15, color: '#374151', lineHeight: 24, textAlign: 'justify' },
 });

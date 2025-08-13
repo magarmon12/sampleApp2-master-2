@@ -1,7 +1,6 @@
-import { ValidIndicator } from '@/components/ui/ValidIndicator';
-import { useUser } from '@/hooks/userContext';
-import { router } from 'expo-router';
+// app/loginPage.tsx
 import React, { useEffect, useState } from 'react';
+import { router } from 'expo-router';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -15,49 +14,35 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import { ValidIndicator } from '@/components/ui/ValidIndicator';
+import { account } from '@/lib/appwrite'; // <-- use your configured instance
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+
   const [validEmail, setValidEmail] = useState(false);
   const [validPassword, setValidPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
 
-  const { login, current: user } = useUser();
+  const [busy, setBusy] = useState(false);
 
-  const getCurrentDateTime = () => {
-    return new Date().toISOString().slice(0, 19).replace('T', ' ') + ' UTC';
-  };
-
-  const handleLogin = async () => {
+  const onLogin = async () => {
+    if (!validEmail || !validPassword) return;
+    setBusy(true);
     try {
-      setIsLoading(true);
-      console.log('🔍 Attempting login for:', email);
-      
-      await login(email, password);
-      
-      console.log('✅ Login successful! Redirecting...');
-      Alert.alert('Success', 'Welcome back! 🎉');
-      router.replace('/(tabs)/Profile');
-      
-    } catch (error: any) {
-      console.error('❌ Login failed:', error.message);
-      Alert.alert('Login Failed', error.message || 'Please check your credentials and try again.');
+      await account.createEmailPasswordSession(email.trim(), password);
+      router.replace('/homeScreen');
+    } catch (err: any) {
+      const msg = err?.message ?? 'Login failed';
+      Alert.alert('Sign in failed', msg);
     } finally {
-      setIsLoading(false);
+      setBusy(false);
     }
   };
 
-  // Auto redirect if already logged in
   useEffect(() => {
-    if (user) {
-      console.log('✅ User already logged in:', user.email);
-      router.replace('/(tabs)/Profile');
-    }
-  }, [user]);
-
-  useEffect(() => {
-    setValidEmail(email.includes('@') && email.length > 3);
+    // Basic email validation
+    setValidEmail(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
   }, [email]);
 
   useEffect(() => {
@@ -72,9 +57,7 @@ export default function LoginPage() {
       >
         <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
           <View style={styles.card}>
-            <Text style={styles.title}>Welcome Back</Text>
-            <Text style={styles.subtitle}>Sign in to continue</Text>
-            <Text style={styles.timestamp}>Current time: {getCurrentDateTime()}</Text>
+            <Text style={styles.title}>Sign In</Text>
 
             <View style={styles.labelRow}>
               <Text style={styles.label}>Email</Text>
@@ -85,9 +68,10 @@ export default function LoginPage() {
               placeholder="you@example.com"
               keyboardType="email-address"
               autoCapitalize="none"
-              onChangeText={setEmail}
+              autoCorrect={false}
               value={email}
-              editable={!isLoading}
+              onChangeText={setEmail}
+              editable={!busy}
             />
 
             <View style={styles.labelRow}>
@@ -98,33 +82,22 @@ export default function LoginPage() {
               style={styles.input}
               placeholder="Minimum 8 characters"
               secureTextEntry
-              onChangeText={setPassword}
               value={password}
-              editable={!isLoading}
+              onChangeText={setPassword}
+              editable={!busy}
             />
 
             <Pressable
-              style={[
-                styles.button,
-                (!(validEmail && validPassword) || isLoading) && styles.buttonDisabled,
-              ]}
-              disabled={!(validEmail && validPassword) || isLoading}
-              onPress={handleLogin}
+              style={[styles.button, (!validEmail || !validPassword || busy) && styles.buttonDisabled]}
+              disabled={!validEmail || !validPassword || busy}
+              onPress={onLogin}
             >
-              {isLoading ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Text style={styles.buttonText}>Sign In</Text>
-              )}
+              {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Sign In</Text>}
             </Pressable>
 
-          
-
-            <Pressable onPress={() => router.push('/signup')}>  
-              <Text style={styles.link}>Don't have an account? Sign Up</Text>
+            <Pressable onPress={() => router.push('/signup')}>
+              <Text style={styles.link}>Don’t have an account? Sign Up</Text>
             </Pressable>
-
-         
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -133,17 +106,9 @@ export default function LoginPage() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#f2f2f7',
-  },
+  safeArea: { flex: 1, backgroundColor: '#f2f2f7' },
   flex: { flex: 1 },
-  container: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
+  container: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
   card: {
     width: '100%',
     maxWidth: 450,
@@ -156,35 +121,9 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
-  title: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#333333',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  timestamp: {
-    fontSize: 12,
-    color: '#007AFF',
-    marginBottom: 24,
-    textAlign: 'center',
-  },
-  labelRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  label: {
-    fontSize: 18,
-    color: '#333333',
-  },
+  title: { fontSize: 32, fontWeight: '700', color: '#333333', marginBottom: 32, textAlign: 'center' },
+  labelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  label: { fontSize: 18, color: '#333333' },
   input: {
     backgroundColor: '#f9f9f9',
     borderRadius: 8,
@@ -200,64 +139,14 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingVertical: 18,
     alignItems: 'center',
-    justifyContent: 'center',
     marginTop: 12,
     shadowColor: '#0066FF',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 2,
-    minHeight: 54,
   },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    fontSize: 18,
-    color: '#ffffff',
-    fontWeight: '700',
-  },
-  testSection: {
-    marginTop: 20,
-    padding: 15,
-    backgroundColor: '#f0f8ff',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#007AFF',
-  },
-  testTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#007AFF',
-    marginBottom: 8,
-  },
-  testButton: {
-    backgroundColor: '#007AFF',
-    padding: 10,
-    borderRadius: 6,
-    alignItems: 'center',
-  },
-  testButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  link: {
-    marginTop: 20,
-    textAlign: 'center',
-    color: '#0066FF',
-    fontSize: 16,
-  },
-  debugSection: {
-    marginTop: 20,
-    padding: 10,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 6,
-  },
-  debugText: {
-    fontSize: 12,
-    color: '#666',
-    textAlign: 'center',
-    fontFamily: 'monospace',
-  },
+  buttonDisabled: { opacity: 0.6 },
+  buttonText: { fontSize: 18, color: '#ffffff', fontWeight: '700' },
+  link: { marginTop: 20, textAlign: 'center', color: '#0066FF', fontSize: 16 },
 });
