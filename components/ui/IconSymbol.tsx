@@ -1,41 +1,49 @@
-// Fallback for using MaterialIcons on Android and web.
+// components/ui/IconSymbol.tsx
+import React from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import type { StyleProp, TextStyle } from 'react-native';
 
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { SymbolWeight, SymbolViewProps } from 'expo-symbols';
-import { ComponentProps } from 'react';
-import { OpaqueColorValue, type StyleProp, type TextStyle } from 'react-native';
+type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
-type IconMapping = Record<SymbolViewProps['name'], ComponentProps<typeof MaterialIcons>['name']>;
-type IconSymbolName = keyof typeof MAPPING;
+// Map your existing names to Ionicons names (works on web)
+const MAP: Record<string, IconName> = {
+  heart: 'heart-outline',
+  'heart.fill': 'heart',
+  person: 'person-outline',
+  'person.fill': 'person',
+  calendar: 'calendar-outline',
+  map: 'map-outline',
+  search: 'search-outline',
+  sparkles: 'star-outline',            // safe fallback across platforms
+  link: 'link-outline',
+  'mappin.and.ellipse': 'location-outline',
+  'chevron.right': 'chevron-forward',
+  close: 'close',
+};
 
-/**
- * Add your SF Symbols to Material Icons mappings here.
- * - see Material Icons in the [Icons Directory](https://icons.expo.fyi).
- * - see SF Symbols in the [SF Symbols](https://developer.apple.com/sf-symbols/) app.
- */
-const MAPPING = {
-  'house.fill': 'home',
-  'paperplane.fill': 'send',
-  'chevron.left.forwardslash.chevron.right': 'code',
-  'chevron.right': 'chevron-right',
-} as IconMapping;
+function mapName(name: string): IconName {
+  return (MAP[name] ?? (name as IconName));
+}
 
-/**
- * An icon component that uses native SF Symbols on iOS, and Material Icons on Android and web.
- * This ensures a consistent look across platforms, and optimal resource usage.
- * Icon `name`s are based on SF Symbols and require manual mapping to Material Icons.
- */
 export function IconSymbol({
   name,
-  size = 24,
-  color,
+  size = 18,
+  color = '#111827',
   style,
 }: {
-  name: IconSymbolName;
+  name: string;
   size?: number;
-  color: string | OpaqueColorValue;
-  style?: StyleProp<TextStyle>;
-  weight?: SymbolWeight;
+  color?: string;
+  style?: any;                          // accept any at the prop level
 }) {
-  return <MaterialIcons color={color} size={size} name={MAPPING[name]} style={style} />;
+  return (
+    <Ionicons
+      name={mapName(name)}
+      size={size}
+      color={color}
+      style={style as StyleProp<TextStyle>}  // cast to what Ionicons expects
+    />
+  );
 }
+
+export default IconSymbol;

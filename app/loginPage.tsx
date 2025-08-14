@@ -15,7 +15,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { ValidIndicator } from '@/components/ui/ValidIndicator';
-import { account } from '@/lib/appwrite'; // <-- use your configured instance
+import { account } from '@/lib/appwrite';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -33,15 +33,19 @@ export default function LoginPage() {
       await account.createEmailPasswordSession(email.trim(), password);
       router.replace('/homeScreen');
     } catch (err: any) {
-      const msg = err?.message ?? 'Login failed';
-      Alert.alert('Sign in failed', msg);
+      const code = err?.code ?? err?.response?.code;
+      const msg =
+        code === 401
+          ? 'Incorrect email or password.'
+          : err?.message ?? 'Login failed';
+      if (Platform.OS === 'web') window.alert(`Sign in failed: ${msg}`);
+      else Alert.alert('Sign in failed', msg);
     } finally {
       setBusy(false);
     }
   };
 
   useEffect(() => {
-    // Basic email validation
     setValidEmail(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
   }, [email]);
 

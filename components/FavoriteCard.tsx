@@ -1,92 +1,130 @@
+// components/FavoriteCard.tsx
 import React, { useMemo } from 'react';
 import {
-  Image, ImageSourcePropType, Pressable, StyleSheet, Text, View,
+  Image,
+  ImageSourcePropType,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
+
+import { getImage } from '@/lib/imageMap';         // single correct import
+import { getPlaceById } from '@/app/data/places';   // to fill missing fields from local data
 
 type Props = {
   title: string;
-  description?: string;
-  /** Can be a URL, a local filename like "HomeKalinchowk.jpg", or a placeId like "kalinchowk" */
-  image?: string;
+  description?: string | null;
+  /** Can be a URL, a local key/filename, or a place id like "kalinchowk" */
+  image?: string | null;
+  /** If provided, we’ll use local data as fallback for image/description */
+  placeId?: string;
   onDelete?: () => void;
   onPress?: () => void;
 };
 
-function resolveImageSource(image?: string, title?: string): ImageSourcePropType | null {
+function resolveSource(
+  input: string | null | undefined,
+  titleGuess: string | undefined,
+  placeImage: any | undefined,
+  placeId: string | undefined
+): ImageSourcePropType | undefined {
   // 1) Remote URL / data / file URI
-  if (image && /^(https?:|data:|file:)/i.test(image)) {
-    return { uri: image };
+  if (input && /^(https?:|data:|file:)/i.test(input)) {
+    return { uri: input };
   }
 
-  // 2) Local bundled filenames (Metro needs static requires)
-  const fileMap: Record<string, ImageSourcePropType> = {
-    'HomeBhaktapur.jpg': require('../assets/images/HomeBhaktapur.jpg'),
-    'HomeBouddha.jpg': require('../assets/images/HomeBouddha.jpg'),
-    'HomeBungee.jpg': require('../assets/images/HomeBungee.jpg'),
-    'HomeKalinchowk.jpg': require('../assets/images/HomeKalinchowk.jpg'),
-    'HomeLumbini.jpg': require('../assets/images/HomeLumbini.jpg'),
-    'HomeNagarkot.jpg': require('../assets/images/HomeNagarkot.jpg'),
-    'HomePashupatinath.jpg': require('../assets/images/HomePashupatinath.jpg'),
-    'HomePokhara.jpg': require('../assets/images/HomePokhara.jpg'),
-    'Homerafting.jpg': require('../assets/images/Homerafting.jpg'),
-    'HomeSkydiving.jpg': require('../assets/images/HomeSkydiving.jpg'),
-    'HomeZipline.jpg': require('../assets/images/HomeZipline.jpg'),
+  // 2) Try central image map directly (keys like "HomePokhara" or basenames like "HomePokhara.jpg")
+  if (input) {
+    const direct = getImage(input);
+    if (direct) return direct;
+
+    const base = decodeURIComponent(input).split('/').pop()!;
+    const baseNoExt = base.replace(/\.(jpg|jpeg|png|webp)$/i, '');
+    const fromBase = getImage(base) || getImage(baseNoExt);
+    if (fromBase) return fromBase;
+  }
+
+  // 3) If the matched Place has a bundled image (static require), use it
+  if (placeImage) return placeImage;
+
+  // 4) Title / placeId keyword guesses → explicit keys in imageMap
+  const tokenMap: Record<string, string> = {
+    // place ids / tokens → imageMap key
+    pokhara: 'HomePokhara',
+    kalinchowk: 'HomeKalinchowk',
+    bhaktapur: 'HomeBhaktapur',
+    bouddha: 'HomeBouddha',
+    nagarkot: 'HomeNagarkot',
+    pashupatinath: 'HomePashupatinath',
+    lumbini: 'HomeLumbini',
+    janakpur: 'HomeJanakpur',
+    bandipur: 'HomeBandipur',
+    kirtipur: 'HomeKirtipur',
+    gorkha: 'HomeGorkha',
+    rara: 'HomeRara',
+    muktinath: 'HomeMuktinath',
+    palanchowk: 'HomePalanchowk',
+    langtang: 'HomeLangtang',
+    canyoning: 'HomeCanyoning',
+    bungee: 'HomeBungee',
+    rockclimbing: 'HomeRockClimbing',
+    mountainbiking: 'HomeMountainBiking',
+    skydiving: 'HomeSkydiving',
+    ultraflight: 'HomeUltraFlight',
+    rafting: 'Homerafting',
+    thimi: 'HomeThimi',
+    tansen: 'HomeTansen',
+    tangboche: 'HomeTangboche',
+    ghandruk: 'HomeGhandruk',
+    ilam: 'Homellam',
+    paragliding: 'HoeParagliding', // actual filename in your repo
   };
 
-  // If a filename (or a full path) was provided, try basename lookup
-  if (image) {
-    const base = decodeURIComponent(image).split('/').pop() || image;
-    if (fileMap[base]) return fileMap[base];
-  }
-
-  // 3) Place ID → filename mapping (handles image prop like "kalinchowk", "pashupatinath")
-  const idToFile: Record<string, string> = {
-    kalinchowk: 'HomeKalinchowk.jpg',
-    pokhara: 'HomePokhara.jpg',
-    nagarkot: 'HomeNagarkot.jpg',
-    bungee: 'HomeBungee.jpg',
-    zipline: 'HomeZipline.jpg',
-    skydiving: 'HomeSkydiving.jpg',
-    rafting: 'Homerafting.jpg',
-    pashupatinath: 'HomePashupatinath.jpg',
-    bouddha: 'HomeBouddha.jpg',
-    bhaktapur: 'HomeBhaktapur.jpg',
-    lumbini: 'HomeLumbini.jpg',
+  const tryTokens = (txt?: string) => {
+    if (!txt) return undefined;
+    const t = txt.toLowerCase();
+    for (const token of Object.keys(tokenMap)) {
+      if (t.includes(token)) {
+        const hit = getImage(tokenMap[token]);
+        if (hit) return hit;
+      }
+    }
   };
-  if (image) {
-    const idKey = image.trim().toLowerCase();
-    const byId = idToFile[idKey];
-    if (byId && fileMap[byId]) return fileMap[byId];
-  }
 
-  // 4) Title → filename mapping (for titles like "Pashupatinath Temple")
-  const titleKey = (title ?? '').toLowerCase();
-  const titleToIdGuess: Array<[string, string]> = [
-    ['kalinchowk', 'HomeKalinchowk.jpg'],
-    ['pokhara', 'HomePokhara.jpg'],
-    ['bhaktapur', 'HomeBhaktapur.jpg'],
-    ['bouddha', 'HomeBouddha.jpg'],
-    ['nagarkot', 'HomeNagarkot.jpg'],
-    ['pashupatinath', 'HomePashupatinath.jpg'],
-    ['lumbini', 'HomeLumbini.jpg'],
-    ['rafting', 'Homerafting.jpg'],
-    ['skydiving', 'HomeSkydiving.jpg'],
-    ['zipline', 'HomeZipline.jpg'],
-  ];
-  for (const [needle, file] of titleToIdGuess) {
-    if (titleKey.includes(needle) && fileMap[file]) return fileMap[file];
-  }
+  const byId = tryTokens(placeId);
+  if (byId) return byId;
 
-  // 5) No match → no image (card shows placeholder)
-  return null;
+  const byTitle = tryTokens(titleGuess);
+  if (byTitle) return byTitle;
+
+  // 5) Nothing found
+  return undefined;
 }
 
-export default function FavoriteCard({ title, description, image, onDelete, onPress }: Props) {
-  const source = useMemo(() => resolveImageSource(image, title), [image, title]);
+export default function FavoriteCard({
+  title,
+  description,
+  image,
+  placeId,
+  onDelete,
+  onPress,
+}: Props) {
+  // Fallback to local places data if DB doc misses fields
+  const place = placeId ? getPlaceById(placeId) : undefined;
 
-  const CardWrapper = onPress ? Pressable : View;
+  const finalTitle = title || place?.title || 'Untitled';
+  const finalDesc = (description ?? undefined) || place?.description;
+
+  const source = useMemo(
+    () => resolveSource(image, finalTitle, place?.image, placeId),
+    [image, finalTitle, place?.image, placeId]
+  );
+
+  const Wrapper: any = onPress ? Pressable : View;
+
   return (
-    <CardWrapper onPress={onPress} style={s.card}>
+    <Wrapper onPress={onPress} style={s.card}>
       {source ? (
         <Image source={source} style={s.thumb} />
       ) : (
@@ -96,8 +134,14 @@ export default function FavoriteCard({ title, description, image, onDelete, onPr
       )}
 
       <View style={s.info}>
-        <Text style={s.title}>{title || 'Untitled'}</Text>
-        {!!description && <Text numberOfLines={2} style={s.desc}>{description}</Text>}
+        <Text style={s.title} numberOfLines={2}>
+          {finalTitle}
+        </Text>
+        {finalDesc ? (
+          <Text numberOfLines={2} style={s.desc}>
+            {finalDesc}
+          </Text>
+        ) : null}
       </View>
 
       {onDelete && (
@@ -105,7 +149,7 @@ export default function FavoriteCard({ title, description, image, onDelete, onPr
           <Text style={s.deleteText}>Delete</Text>
         </Pressable>
       )}
-    </CardWrapper>
+    </Wrapper>
   );
 }
 

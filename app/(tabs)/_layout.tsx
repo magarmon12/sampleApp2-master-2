@@ -4,6 +4,7 @@ import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Tabs } from 'expo-router';
 import React from 'react';
+import { Platform } from 'react-native';
 
 export default function TabsLayout() {
   const scheme = useColorScheme();
@@ -12,60 +13,56 @@ export default function TabsLayout() {
 
   return (
     <Tabs
-      initialRouteName="homeScreen"
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: tint,
         tabBarInactiveTintColor: inactive,
-        tabBarLabelStyle: { fontSize: 12 },
+        // Keep the bar clickable on web and pinned to the bottom
+        tabBarStyle:
+          Platform.OS === 'web'
+            ? { position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 10 }
+            : undefined,
       }}
     >
-      {/* 1) Home */}
       <Tabs.Screen
         name="homeScreen"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color, size }) => (
-            <IconSymbol name="house.fill" color={color} size={size ?? 22} />
+          tabBarIcon: ({ color, size, focused }) => (
+            <IconSymbol name={focused ? 'house.fill' : 'house'} color={color} size={size} />
           ),
         }}
       />
 
-      {/* 2) Favourites */}
       <Tabs.Screen
         name="Favourites"
         options={{
           title: 'Favourites',
-          tabBarIcon: ({ color, size }) => (
-            <IconSymbol name="heart" color={color} size={size ?? 22} />
+          tabBarIcon: ({ color, size, focused }) => (
+            <IconSymbol name={focused ? 'heart.fill' : 'heart'} color={color} size={size} />
           ),
         }}
       />
 
-      {/* 3) Hidden Gems */}
       <Tabs.Screen
-        name="hiddenGem"
+        name="HiddenGem"
         options={{
-          title: 'HiddenGem',
+          title: 'Hidden Gems',
           tabBarIcon: ({ color, size }) => (
-            <IconSymbol name="sparkles" color={color} size={size ?? 22} />
+            <IconSymbol name="sparkles" color={color} size={size} />
           ),
         }}
       />
 
-      {/* 4) Profile */}
       <Tabs.Screen
-        name="profile"
+        name="Profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ color, size }) => (
-            <IconSymbol name="person.crop.circle" color={color} size={size ?? 22} />
+          tabBarIcon: ({ color, size, focused }) => (
+            <IconSymbol name={focused ? 'person.fill' : 'person'} color={color} size={size} />
           ),
         }}
       />
-
-      {/* Discover removed intentionally. If a file still exists, keep it hidden: */}
-      {/* <Tabs.Screen name="Discover" options={{ href: null }} /> */}
     </Tabs>
   );
 }
